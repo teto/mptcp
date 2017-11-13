@@ -3945,6 +3945,7 @@ static bool tcp_fast_parse_options(const struct sk_buff *skb,
 		return false;
 	} else if (tp->rx_opt.tstamp_ok &&
 		   th->doff == ((sizeof(*th) + TCPOLEN_TSTAMP_ALIGNED) / 4)) {
+		/* timestamps on 1° bytes 12 bytes  */
 		if (tcp_parse_aligned_timestamp(tp, th))
 			return true;
 	}
@@ -5794,8 +5795,11 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 	tcp_parse_options(skb, &tp->rx_opt,
 			  mptcp(tp) ? &tp->mptcp->rx_opt : &mopt, 0, &foc, tp);
-	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr)
+	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr) {
+		/* if extended mode, need to retrieve peer capabilities before the offset */
+		if ()
 		tp->rx_opt.rcv_tsecr -= tp->tsoffset;
+	}
 
 	if (th->ack) {
 		/* rfc793:
@@ -6403,6 +6407,10 @@ static void tcp_openreq_init(struct request_sock *req,
 	tcp_rsk(req)->last_oow_ack_time = 0;
 	req->mss = rx_opt->mss_clamp;
 	req->ts_recent = rx_opt->saw_tstamp ? rx_opt->rcv_tsval : 0;
+    ireq->tstamp_extended = rx_opt->saw_tstamp ?
+            (rx_opt->rcv_tsecr & TCP_TS_EXO_MASK ) : 0;
+    printk (KERN_INFO "ts accepted ? = %d", ireq->tstamp_extended);
+
 	ireq->tstamp_ok = rx_opt->tstamp_ok;
 	ireq->sack_ok = rx_opt->sack_ok;
 	ireq->snd_wscale = rx_opt->snd_wscale;

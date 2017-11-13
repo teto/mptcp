@@ -203,6 +203,9 @@ struct tcp_info {
 	__u32	tcpi_rcv_ssthresh;
 	__u32	tcpi_rtt;
 	__u32	tcpi_rttvar;
+    __u32   tcpi_owd[2];    /* one for each direction */
+    __u32   tcpi_owdvar[2];
+
 	__u32	tcpi_snd_ssthresh;
 	__u32	tcpi_snd_cwnd;
 	__u32	tcpi_advmss;

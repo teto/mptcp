@@ -538,6 +538,39 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		mptcp_options_write(ptr, tp, opts, skb);
 }
 
+/*
+https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
+*/
+int tcp_ts_interval ()
+{
+       /* for now we assume both kernels have similar precision */
+       return 0;
+}
+
+/**
+ * follows the specs in "encoding of timestamp intervals"
+ * 0x4432
+ * returns 0 in case of an error
+ */
+/* un tcp_clock_resolution()*/
+/* {*/
+/*     struct timespec res;*/
+/*     /* CLOCK_REALTIME is not monotonic, it can be set back by ntp*/
+/*      * CLOCK_MONOTONIC should be good but not for OWDs*/
+/*      * CLOCK_MONOTONIC_RAW is less precise but faster*/
+/*      */*/
+/*     int res = clock_getres( CLOCK_REALTIME, &res):*/
+/*     if (res != 0) {*/
+/*             return 0;*/
+/*     }*/
+/*     printk(*/
+/*     pr_devel_once*/
+/*     pr_debug()*/
+/*     res.tv_nsec;*/
+
+/* }*/
+
+
 /* Compute TCP options for SYN packets. This is not the final
  * network wire format yet.
  */
@@ -575,6 +608,18 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 		opts->options |= OPTION_TS;
 		opts->tsval = tcp_skb_timestamp(skb) + tp->tsoffset;
 		opts->tsecr = tp->rx_opt.ts_recent;
+		if (opts->tsecr == 0 && sysctl_tcp_timestamps > 2) {
+				/* we set the EXO = extended option (1 bit)
+					* defined in "additional negotiation in the TCP Timestamp Option field during the TCP handshake" draft
+					* version is on 2 bits (0 for now)
+					*/
+				opts->tsecr = TCP_TS_EXO_MASK | tcp_ts_interval();
+
+		} else {
+			/* that's 0 */
+			printk(KERN_WARN "tsecr is not null %d", opts->tsecr);
+		}
+
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
 	}
 	if (likely(sysctl_tcp_window_scaling)) {
@@ -645,6 +690,13 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 		opts->options |= OPTION_TS;
 		opts->tsval = tcp_skb_timestamp(skb);
 		opts->tsecr = req->ts_recent;
+
+		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
+				/* return sender tsval XOR our config. why the xor ? for middlebox ? */
+				/* maybe it should be called EXO_BIT */
+				opts->tsecr = req->tsval ^ (TCP_TS_EXO_MASK | tcp_get
+		}
+
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
 	}
 	if (likely(ireq->sack_ok)) {
@@ -700,6 +752,14 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		opts->tsecr = tp->rx_opt.ts_recent;
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}
+	/* MY ADDITIONS maybe move it up */
+	if (likely(tp->rx_opt.owd_ok)) {
+			opts->options |= OPTION_OWD;
+			opts->tsval = skb ? tcp_skb_timestamp_owd(skb) + tp->owd_offset : 0;
+			opts->tsecr = tp->rx_opt.ts_recent;
+			size += TCPOLEN_TSTAMP_ALIGNED;
+	}
+
 	if (mptcp(tp))
 		mptcp_established_options(sk, skb, opts, &size);
 

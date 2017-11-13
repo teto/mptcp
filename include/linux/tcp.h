@@ -91,6 +91,7 @@ struct tcp_out_options {
 	u16	mss;		/* 0 to disable */
 	__u8	*hash_location;	/* temporary pointer, overloaded */
 	__u32	tsval, tsecr;	/* need to include OPTION_TS */
+	__u32   tsval, tsecr;   /* need to include OPTION_OWD */
 	struct tcp_fastopen_cookie *fastopen_cookie;	/* Fast open cookie */
 #ifdef CONFIG_MPTCP
 	u16	mptcp_options;	/* bit field of MPTCP related OPTION_* */
@@ -138,6 +139,8 @@ struct tcp_out_options {
 #define TCP_FACK_ENABLED  (1 << 1)   /*1 = FACK is enabled locally*/
 #define TCP_DSACK_SEEN    (1 << 2)   /*1 = DSACK was received from peer*/
 
+#define TCP_TS_EXO_MASK    (1 << 31)
+
 struct tcp_options_received {
 /*	PAWS/RTTM data	*/
 	long	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
@@ -146,6 +149,7 @@ struct tcp_options_received {
 	u32	rcv_tsecr;	/* Time stamp echo reply        	*/
 	u16 	saw_tstamp : 1,	/* Saw TIMESTAMP on last packet		*/
 		tstamp_ok : 1,	/* TIMESTAMP seen on SYN packet		*/
+		tstamp_extended : 1,    /*  seen on SYN packet          */
 		dsack : 1,	/* D-SACK is scheduled			*/
 		wscale_ok : 1,	/* Wscale seen on SYN packet		*/
 		sack_ok : 4,	/* SACK seen on SYN packet		*/
@@ -162,6 +166,7 @@ struct mptcp_tcp_sock;
 static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
 {
 	rx_opt->tstamp_ok = rx_opt->sack_ok = 0;
+	rx_opt->tstamp_extended = 0;
 	rx_opt->wscale_ok = rx_opt->snd_wscale = 0;
 }
 
@@ -244,7 +249,7 @@ struct tcp_sock {
 	u32	lsndtime;	/* timestamp of last sent data packet (for restart window) */
 	u32	last_oow_ack_time;  /* timestamp of last out-of-window ACK */
 
-	u32	tsoffset;	/* timestamp offset */
+	u32	tsoffset;	/* timestamp offset (influenced by TCP_TIMESTAMP/ sysctl value)*/
 
 	struct list_head tsq_node; /* anchor in tsq_tasklet.head list */
 	unsigned long	tsq_flags;
