@@ -91,7 +91,6 @@ struct tcp_out_options {
 	u16	mss;		/* 0 to disable */
 	__u8	*hash_location;	/* temporary pointer, overloaded */
 	__u32	tsval, tsecr;	/* need to include OPTION_TS */
-	__u32   tsval, tsecr;   /* need to include OPTION_OWD */
 	struct tcp_fastopen_cookie *fastopen_cookie;	/* Fast open cookie */
 #ifdef CONFIG_MPTCP
 	u16	mptcp_options;	/* bit field of MPTCP related OPTION_* */
@@ -249,7 +248,8 @@ struct tcp_sock {
 	u32	lsndtime;	/* timestamp of last sent data packet (for restart window) */
 	u32	last_oow_ack_time;  /* timestamp of last out-of-window ACK */
 
-	u32	tsoffset;	/* timestamp offset (influenced by TCP_TIMESTAMP/ sysctl value)*/
+	u32	tsoffset;	/* timestamp offset (influenced by TCP_TIMESTAMP and sysctl 
+					   * value starting from kernel 4.10 */
 
 	struct list_head tsq_node; /* anchor in tsq_tasklet.head list */
 	unsigned long	tsq_flags;
@@ -394,6 +394,18 @@ struct tcp_sock {
 		u32	seq;
 		u32	time;
 	} rcv_rtt_est;
+
+/* Receiver side OWD estimation
+ * this can be used to store the initial timestamp
+ * or TODO check that 'lsndtime' can be used
+ * could have called it ott but was too easy to mistake with rtt
+ * TODO maybe it should be 
+ * */
+	struct {
+		u32	rtt;
+		u32	seq;
+		u32	time;
+	} rcv_owd_est;
 
 /* Receiver queue space */
 	struct {

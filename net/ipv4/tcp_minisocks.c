@@ -773,8 +773,13 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 
 	/* In sequence, PAWS is OK. */
 
-	if (tmp_opt.saw_tstamp && !after(TCP_SKB_CB(skb)->seq, tcp_rsk(req)->rcv_nxt))
+	if (tmp_opt.saw_tstamp && !after(TCP_SKB_CB(skb)->seq, tcp_rsk(req)->rcv_nxt)) {
 		req->ts_recent = tmp_opt.rcv_tsval;
+		if (sysctl_tcp_timestamps > 2) {
+			printk(KERN_INFO "Setting ts_ecr to %d", tmp_opt.rcv_tsecr);
+			req->ts_ecr = tmp_opt.rcv_tsecr;
+		}
+	}
 
 	if (TCP_SKB_CB(skb)->seq == tcp_rsk(req)->rcv_isn) {
 		/* Truncate SYN, it is out of window starting

@@ -541,7 +541,7 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 /*
 https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
 */
-int tcp_ts_interval ()
+int tcp_ts_interval (void)
 {
        /* for now we assume both kernels have similar precision */
        return 0;
@@ -555,10 +555,10 @@ int tcp_ts_interval ()
 /* un tcp_clock_resolution()*/
 /* {*/
 /*     struct timespec res;*/
-/*     /* CLOCK_REALTIME is not monotonic, it can be set back by ntp*/
-/*      * CLOCK_MONOTONIC should be good but not for OWDs*/
-/*      * CLOCK_MONOTONIC_RAW is less precise but faster*/
-/*      */*/
+    /* CLOCK_REALTIME is not monotonic, it can be set back by ntp
+     * CLOCK_MONOTONIC should be good but not for OWDs
+     * CLOCK_MONOTONIC_RAW is less precise but faster
+     */
 /*     int res = clock_getres( CLOCK_REALTIME, &res):*/
 /*     if (res != 0) {*/
 /*             return 0;*/
@@ -617,7 +617,7 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 
 		} else {
 			/* that's 0 */
-			printk(KERN_WARN "tsecr is not null %d", opts->tsecr);
+			printk(KERN_WARNING "tsecr is not null %d", opts->tsecr);
 		}
 
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
@@ -694,7 +694,7 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
 				/* return sender tsval XOR our config. why the xor ? for middlebox ? */
 				/* maybe it should be called EXO_BIT */
-				opts->tsecr = req->tsval ^ (TCP_TS_EXO_MASK | tcp_get
+				opts->tsecr = req->ts_recent ^ (TCP_TS_EXO_MASK | tcp_ts_interval());
 		}
 
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
@@ -752,14 +752,6 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		opts->tsecr = tp->rx_opt.ts_recent;
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}
-	/* MY ADDITIONS maybe move it up */
-	if (likely(tp->rx_opt.owd_ok)) {
-			opts->options |= OPTION_OWD;
-			opts->tsval = skb ? tcp_skb_timestamp_owd(skb) + tp->owd_offset : 0;
-			opts->tsecr = tp->rx_opt.ts_recent;
-			size += TCPOLEN_TSTAMP_ALIGNED;
-	}
-
 	if (mptcp(tp))
 		mptcp_established_options(sk, skb, opts, &size);
 

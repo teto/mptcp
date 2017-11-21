@@ -60,6 +60,7 @@ struct request_sock {
 	u8				cookie_ts:1; /* syncookie: encode tcpopts in timestamp */
 	u8				num_timeout:7; /* number of timeouts */
 	u32				ts_recent;
+	u32				ts_ecr;  /* in extended timestamp, tsopt ecr is used too */
 	struct timer_list		rsk_timer;
 	const struct request_sock_ops	*rsk_ops;
 	struct sock			*sk;

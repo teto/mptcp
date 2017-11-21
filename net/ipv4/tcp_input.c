@@ -5796,8 +5796,16 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 	tcp_parse_options(skb, &tp->rx_opt,
 			  mptcp(tp) ? &tp->mptcp->rx_opt : &mopt, 0, &foc, tp);
 	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr) {
+
 		/* if extended mode, need to retrieve peer capabilities before the offset */
-		if ()
+		if (sysctl_tcp_timestamps > 2) {
+			/* lsndtime */
+			if (tp->rx_opt.rcv_tsecr == tp->lsndtime) {
+				printk ("server doesn't support extended ts it seems");
+			} else {
+				tp->rx_opt.rcv_tsecr ^= tp->lsndtime;
+			}
+		}
 		tp->rx_opt.rcv_tsecr -= tp->tsoffset;
 	}
 
