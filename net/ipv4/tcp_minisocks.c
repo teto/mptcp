@@ -546,6 +546,7 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 						       keepalive_time_when(newtp));
 
 		newtp->rx_opt.tstamp_ok = ireq->tstamp_ok;
+		newtp->rx_opt.tstamp_extended = ireq->tstamp_extended;
 		if ((newtp->rx_opt.sack_ok = ireq->sack_ok) != 0) {
 			if (sysctl_tcp_fack)
 				tcp_enable_fack(newtp);
@@ -566,6 +567,7 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 		newtp->max_window = newtp->snd_wnd;
 
 		if (newtp->rx_opt.tstamp_ok) {
+			// todo might need a change
 			newtp->rx_opt.ts_recent = req->ts_recent;
 			newtp->rx_opt.ts_recent_stamp = get_seconds();
 			newtp->tcp_header_len = sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;

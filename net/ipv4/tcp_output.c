@@ -617,7 +617,7 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 
 		} else {
 			/* that's 0 */
-			printk(KERN_WARNING "tsecr is not null %d", opts->tsecr);
+			printk(KERN_WARNING "tsecr is not null %u", opts->tsecr);
 		}
 
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
@@ -748,6 +748,7 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 
 	if (likely(tp->rx_opt.tstamp_ok)) {
 		opts->options |= OPTION_TS;
+		/// we might need more precisions there
 		opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0;
 		opts->tsecr = tp->rx_opt.ts_recent;
 		size += TCPOLEN_TSTAMP_ALIGNED;

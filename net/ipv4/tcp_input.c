@@ -513,6 +513,7 @@ EXPORT_SYMBOL(tcp_initialize_rcv_mss);
  * <http://staff.psc.edu/jheffner/>,
  * though this reference is out of date.  A new paper
  * is pending.
+ * @param win_dep is set to 0 when called from tcp_rcv_rtt_measure_ts, 1 otherwise
  */
 static void tcp_rcv_rtt_update(struct tcp_sock *tp, u32 sample, int win_dep)
 {
@@ -700,6 +701,79 @@ static void tcp_event_data_recv(struct sock *sk, struct sk_buff *skb)
 
 	if (skb->len >= 128)
 		tcp_grow_window(sk, skb);
+}
+
+/* Called to compute a smoothed rtt estimate. The data fed to this
+ * routine either comes from timestamps, or from segments that were
+ * known _not_ to have been retransmitted [see Karn/Partridge
+ * Proceedings SIGCOMM 87]. The algorithm is from the SIGCOMM 88
+ * piece by Van Jacobson.
+  See original tcp_rtt_estimator for good code
+del_est
+mdev = medium deviation
+ */
+static void tcp_owd_estimator(struct sock *sk, tcp_delay_est* est, long mrtt_us)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+	long m = mrtt_us; /* owd */
+	u32 delay = tp->owd_out;
+
+	/*	The following amusing code comes from Jacobson's
+	 *	article in SIGCOMM '88.  Note that rtt and mdev
+	 *	are scaled versions of rtt and mean deviation.
+	 *	This is designed to be as fast as possible
+	 *	m stands for "measurement".
+	 *
+	 *	On a 1990 paper the rto value is changed to:
+	 *	RTO = rtt + 4 * mdev
+	 *
+	 * Funny. This algorithm seems to be very broken.
+	 * These formulae increase RTO, when it should be decreased, increase
+	 * too slowly, when it should be increased quickly, decrease too quickly
+	 * etc. I guess in BSD RTO takes ONE value, so that it is absolutely
+	 * does not matter how to _calculate_ it. Seems, it was trap
+	 * that VJ failed to avoid. 8)
+	 */
+	if (delay != 0) {
+		m -= (delay >> 3);	/* m is now error in rtt est */
+		delay += m;		/* rtt = 7/8 rtt + 1/8 new */
+		if (m < 0) {
+			m = -m;		/* m is now abs(error) */
+			m -= (est->mdev_us >> 2);   /* similar update on mdev */
+			/* This is similar to one of Eifel findings.
+			 * Eifel blocks mdev updates when rtt decreases.
+			 * This solution is a bit different: we use finer gain
+			 * for mdev in this case (alpha*beta).
+			 * Like Eifel it also prevents growth of rto,
+			 * but also it limits too fast rto decreases,
+			 * happening in pure Eifel.
+			 */
+			if (m > 0)
+				m >>= 3;
+		} else {
+			m -= (est->mdev_us >> 2);   /* similar update on mdev */
+		}
+		est->mdev_us += m;		/* mdev = 3/4 mdev + 1/4 new */
+		if (est->mdev_us > est->mdev_max_us) {
+			est->mdev_max_us = est->mdev_us;
+			if (est->mdev_max_us > est->rttvar_us)
+				est->rttvar_us = est->mdev_max_us;
+		}
+		if (after(tp->snd_una, est->rtt_seq)) {
+			if (est->mdev_max_us < est->rttvar_us)
+				est->rttvar_us -= (est->rttvar_us - est->mdev_max_us) >> 2;
+			est->rtt_seq = rtt->snd_nxt;
+			est->mdev_max_us = tcp_rto_min_us(sk);
+		}
+	} else {
+		/* no previous measure. */
+		delay = m << 3;		/* take the measured time to be rtt */
+		est->mdev_us = m << 1;	/* make sure rto = 3*rtt */
+		est->rttvar_us = max(est->mdev_us, tcp_rto_min_us(sk));
+		est->mdev_max_us = est->rttvar_us;
+		est->rtt_seq = tp->snd_nxt;
+	}
+	est->delay_us = max(1U, delay);
 }
 
 /* Called to compute a smoothed rtt estimate. The data fed to this
@@ -2977,9 +3051,16 @@ static inline bool tcp_ack_update_rtt(struct sock *sk, const int flag,
 	 * See draft-ietf-tcplw-high-performance-00, section 3.3.
 	 */
 	if (seq_rtt_us < 0 && tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr &&
-	    flag & FLAG_ACKED)
+	    flag & FLAG_ACKED) {
 		seq_rtt_us = ca_rtt_us = jiffies_to_usecs(tcp_time_stamp -
 							  tp->rx_opt.rcv_tsecr);
+		/* we should be able to use the data with tcp sack */
+		if (tp->rx_opt.saw_tstamp &&  tp->rx_opt.saw_tstamp_extended) {
+			//	:w
+
+		}
+	}
+
 	if (seq_rtt_us < 0)
 		return false;
 

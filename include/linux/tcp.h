@@ -297,6 +297,21 @@ struct tcp_sock {
 	u32	tlp_high_seq;	/* snd_nxt at the time of TLP retransmit. */
 
 /* RTT measurement */
+/* could be factorized with OWD variant. rename some fields too ? */
+
+	struct {
+		u32	delay_us;	/* smoothed round trip time << 3 in usecs */
+		u32	mdev_us;	/* medium deviation			*/
+		u32	mdev_max_us;	/* maximal mdev for the last rtt period	*/
+		u32	rttvar_us;	/* smoothed mdev_max			*/
+		u32	rtt_seq;	/* sequence number to update rttvar	*/
+
+		struct  minmax rtt_min;
+	} tcp_delay_est;
+
+	tcp_delay_est owd_out; /* forward OWD estimation */
+	tcp_delay_est owd_in;  /* backward OWD estimation */
+
 	u32	srtt_us;	/* smoothed round trip time << 3 in usecs */
 	u32	mdev_us;	/* medium deviation			*/
 	u32	mdev_max_us;	/* maximal mdev for the last rtt period	*/
@@ -402,7 +417,7 @@ struct tcp_sock {
  * TODO maybe it should be 
  * */
 	struct {
-		u32	rtt;
+		u32	owd; /* we might use sthg more precise */
 		u32	seq;
 		u32	time;
 	} rcv_owd_est;
