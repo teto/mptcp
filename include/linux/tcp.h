@@ -299,7 +299,7 @@ struct tcp_sock {
 /* RTT measurement */
 /* could be factorized with OWD variant. rename some fields too ? */
 
-	struct {
+	struct tcp_delay_est {
 		u32	delay_us;	/* smoothed round trip time << 3 in usecs */
 		u32	mdev_us;	/* medium deviation			*/
 		u32	mdev_max_us;	/* maximal mdev for the last rtt period	*/
@@ -307,10 +307,10 @@ struct tcp_sock {
 		u32	rtt_seq;	/* sequence number to update rttvar	*/
 
 		struct  minmax rtt_min;
-	} tcp_delay_est;
+	} owd_out, od_in;
 
-	tcp_delay_est owd_out; /* forward OWD estimation */
-	tcp_delay_est owd_in;  /* backward OWD estimation */
+	/* struct tcp_delay_est owd_out; /1* forward OWD estimation *1/ */
+	/* struct tcp_delay_est owd_in;  /1* backward OWD estimation *1/ */
 
 	u32	srtt_us;	/* smoothed round trip time << 3 in usecs */
 	u32	mdev_us;	/* medium deviation			*/

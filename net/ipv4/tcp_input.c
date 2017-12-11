@@ -712,11 +712,11 @@ static void tcp_event_data_recv(struct sock *sk, struct sk_buff *skb)
 del_est
 mdev = medium deviation
  */
-static void tcp_owd_estimator(struct sock *sk, tcp_delay_est* est, long mrtt_us)
+static void tcp_owd_estimator(struct sock *sk, struct tcp_delay_est* est, long mes_delay_us)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-	long m = mrtt_us; /* owd */
-	u32 delay = tp->owd_out;
+	long m = mes_delay_us; /* owd */
+	u32 delay = est->delay_us; /* rename to smooth delay */
 
 	/*	The following amusing code comes from Jacobson's
 	 *	article in SIGCOMM '88.  Note that rtt and mdev
@@ -726,13 +726,6 @@ static void tcp_owd_estimator(struct sock *sk, tcp_delay_est* est, long mrtt_us)
 	 *
 	 *	On a 1990 paper the rto value is changed to:
 	 *	RTO = rtt + 4 * mdev
-	 *
-	 * Funny. This algorithm seems to be very broken.
-	 * These formulae increase RTO, when it should be decreased, increase
-	 * too slowly, when it should be increased quickly, decrease too quickly
-	 * etc. I guess in BSD RTO takes ONE value, so that it is absolutely
-	 * does not matter how to _calculate_ it. Seems, it was trap
-	 * that VJ failed to avoid. 8)
 	 */
 	if (delay != 0) {
 		m -= (delay >> 3);	/* m is now error in rtt est */
@@ -763,13 +756,14 @@ static void tcp_owd_estimator(struct sock *sk, tcp_delay_est* est, long mrtt_us)
 			if (est->mdev_max_us < est->rttvar_us)
 				est->rttvar_us -= (est->rttvar_us - est->mdev_max_us) >> 2;
 			est->rtt_seq = rtt->snd_nxt;
-			est->mdev_max_us = tcp_rto_min_us(sk);
+			/* est->mdev_max_us = tcp_rto_min_us(sk); */
 		}
 	} else {
 		/* no previous measure. */
 		delay = m << 3;		/* take the measured time to be rtt */
 		est->mdev_us = m << 1;	/* make sure rto = 3*rtt */
-		est->rttvar_us = max(est->mdev_us, tcp_rto_min_us(sk));
+		est->rttvar_us = 0 ;
+		/* max(est->mdev_us, tcp_rto_min_us(sk)); */
 		est->mdev_max_us = est->rttvar_us;
 		est->rtt_seq = tp->snd_nxt;
 	}
