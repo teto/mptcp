@@ -694,7 +694,8 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
 				/* return sender tsval XOR our config. why the xor ? for middlebox ? */
 				/* maybe it should be called EXO_BIT */
-				opts->tsecr = req->ts_recent ^ (TCP_TS_EXO_MASK | tcp_ts_interval());
+			printk ("synACK crafted with extended ts");
+			opts->tsecr = req->ts_recent ^ (TCP_TS_EXO_MASK | tcp_ts_interval());
 		}
 
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
@@ -750,7 +751,11 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		opts->options |= OPTION_TS;
 		/// we might need more precisions there
 		opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0;
+
+		/* In extended mode, the ts_recent value was changed to the forward OWD
+		 */
 		opts->tsecr = tp->rx_opt.ts_recent;
+
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}
 	if (mptcp(tp))

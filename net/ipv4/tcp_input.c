@@ -3046,12 +3046,13 @@ static inline bool tcp_ack_update_rtt(struct sock *sk, const int flag,
 	 */
 	if (seq_rtt_us < 0 && tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr &&
 	    flag & FLAG_ACKED) {
+		if (tp->rx_opt.tstamp_extended) {
 		seq_rtt_us = ca_rtt_us = jiffies_to_usecs(tcp_time_stamp -
 							  tp->rx_opt.rcv_tsecr);
+		}
 		/* we should be able to use the data with tcp sack */
-		if (tp->rx_opt.saw_tstamp &&  tp->rx_opt.saw_tstamp_extended) {
+		if (tp->rx_opt.saw_tstamp &&  tp->rx_opt.tstamp_extended) {
 			//	:w
-
 		}
 	}
 
@@ -3587,9 +3588,24 @@ static void tcp_send_challenge_ack(struct sock *sk, const struct sk_buff *skb)
 	}
 }
 
+/* the ts_recent stuff might break with extended ts */
 static void tcp_store_ts_recent(struct tcp_sock *tp)
 {
-	tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
+	/* In extended mode, the ts_recent value is changed to the forward OWD
+	 * also updates
+	 */
+	if (tp->rx_opt.tstamp_extended) {
+		/* printk ("Storing recent value");
+		 * computes OWD, updates the value too
+		 */
+		tp->rx_opt.ts_recent = tcp_time_stamp - tp->rx_opt.rcv_tsval;
+		tcp_owd_estimator(tp, tp->owd_in, tp->rx_opt.ts_recent);
+		/* check it 's not 0 */
+		tcp_owd_estimator(tp, tp->owd_out, tp->rx_opt.rcv_tsecr);
+
+	} else {
+		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
+	}
 	tp->rx_opt.ts_recent_stamp = get_seconds();
 }
 
@@ -3932,6 +3948,7 @@ void tcp_parse_options(const struct sk_buff *skb,
 					opt_rx->saw_tstamp = 1;
 					opt_rx->rcv_tsval = get_unaligned_be32(ptr);
 					opt_rx->rcv_tsecr = get_unaligned_be32(ptr + 4);
+					/* the logic part should be in state-specific functions, don't modify here */
 				}
 				break;
 			case TCPOPT_SACK_PERM:
@@ -3997,9 +4014,9 @@ static bool tcp_parse_aligned_timestamp(struct tcp_sock *tp, const struct tcphdr
 		++ptr;
 		tp->rx_opt.rcv_tsval = ntohl(*ptr);
 		++ptr;
-		if (*ptr)
+		if (*ptr) {
 			tp->rx_opt.rcv_tsecr = ntohl(*ptr) - tp->tsoffset;
-		else
+		} else
 			tp->rx_opt.rcv_tsecr = 0;
 		return true;
 	}
@@ -4110,6 +4127,7 @@ static int tcp_disordered_ack(const struct sock *sk, const struct sk_buff *skb)
 		!tcp_may_update_window(tp, ack, seq, ntohs(th->window) << tp->rx_opt.snd_wscale) &&
 
 		/* 4. ... and sits in replay window. */
+		/* we might want */
 		(s32)(tp->rx_opt.ts_recent - tp->rx_opt.rcv_tsval) <= (inet_csk(sk)->icsk_rto * 1024) / HZ);
 }
 
@@ -5874,14 +5892,22 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		/* if extended mode, need to retrieve peer capabilities before the offset */
 		if (sysctl_tcp_timestamps > 2) {
-			/* lsndtime */
+			/* In extended mode, synack ts.ecr should contain the server precision
+			 *
+			 * lsndtime */
 			if (tp->rx_opt.rcv_tsecr == tp->lsndtime) {
 				printk ("server doesn't support extended ts it seems");
 			} else {
 				tp->rx_opt.rcv_tsecr ^= tp->lsndtime;
+				tp->rx_opt.tstamp_extended = 1;
+
+				printk ("server supports extended ts with precision TODO");
 			}
+				/* TODO set it to 0 */
+			/* tp->rx_opt.rcv_tsecr */
+		} else {
+			tp->rx_opt.rcv_tsecr -= tp->tsoffset;
 		}
-		tp->rx_opt.rcv_tsecr -= tp->tsoffset;
 	}
 
 	if (th->ack) {

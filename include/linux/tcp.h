@@ -144,11 +144,11 @@ struct tcp_options_received {
 /*	PAWS/RTTM data	*/
 	long	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
 	u32	ts_recent;	/* Time stamp to echo next		*/
-	u32	rcv_tsval;	/* Time stamp value             	*/
-	u32	rcv_tsecr;	/* Time stamp echo reply        	*/
+	u32	rcv_tsval;	/* raw Time stamp value             	*/
+	u32	rcv_tsecr;	/* raw Time stamp echo reply        	*/
 	u16 	saw_tstamp : 1,	/* Saw TIMESTAMP on last packet		*/
 		tstamp_ok : 1,	/* TIMESTAMP seen on SYN packet		*/
-		tstamp_extended : 1,    /*  seen on SYN packet          */
+		tstamp_extended : 1,    /* Extended timestamp has been negociated */
 		dsack : 1,	/* D-SACK is scheduled			*/
 		wscale_ok : 1,	/* Wscale seen on SYN packet		*/
 		sack_ok : 4,	/* SACK seen on SYN packet		*/
