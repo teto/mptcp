@@ -712,9 +712,9 @@ static void tcp_event_data_recv(struct sock *sk, struct sk_buff *skb)
 del_est
 mdev = medium deviation
  */
-static void tcp_owd_estimator(struct sock *sk, struct tcp_delay_est* est, long mes_delay_us)
+static void tcp_owd_estimator(struct tcp_sock *tp, struct tcp_delay_est* est, long mes_delay_us)
 {
-	struct tcp_sock *tp = tcp_sk(sk);
+	/* struct tcp_sock *tp = tcp_sk(sk); */
 	long m = mes_delay_us; /* owd */
 	u32 delay = est->delay_us; /* rename to smooth delay */
 
@@ -755,7 +755,7 @@ static void tcp_owd_estimator(struct sock *sk, struct tcp_delay_est* est, long m
 		if (after(tp->snd_una, est->rtt_seq)) {
 			if (est->mdev_max_us < est->rttvar_us)
 				est->rttvar_us -= (est->rttvar_us - est->mdev_max_us) >> 2;
-			est->rtt_seq = rtt->snd_nxt;
+			est->rtt_seq = tp->snd_nxt;
 			/* est->mdev_max_us = tcp_rto_min_us(sk); */
 		}
 	} else {
@@ -3599,9 +3599,9 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 		 * computes OWD, updates the value too
 		 */
 		tp->rx_opt.ts_recent = tcp_time_stamp - tp->rx_opt.rcv_tsval;
-		tcp_owd_estimator(tp, tp->owd_in, tp->rx_opt.ts_recent);
+		tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);
 		/* check it 's not 0 */
-		tcp_owd_estimator(tp, tp->owd_out, tp->rx_opt.rcv_tsecr);
+		tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr);
 
 	} else {
 		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;

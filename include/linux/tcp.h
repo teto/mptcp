@@ -307,7 +307,7 @@ struct tcp_sock {
 		u32	rtt_seq;	/* sequence number to update rttvar	*/
 
 		struct  minmax rtt_min;
-	} owd_out, od_in;
+	} owd_out, owd_in;
 
 	/* struct tcp_delay_est owd_out; /1* forward OWD estimation *1/ */
 	/* struct tcp_delay_est owd_in;  /1* backward OWD estimation *1/ */
