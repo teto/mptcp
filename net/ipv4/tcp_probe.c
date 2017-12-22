@@ -71,6 +71,8 @@ struct tcp_log {
 	u32	snd_cwnd;
 	u32	ssthresh;
 	u32	srtt;
+	u32	sowd_out;
+	u32	sowd_in;
 };
 
 static struct {
@@ -153,6 +155,8 @@ static void jtcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 			p->rcv_wnd = tp->rcv_wnd;
 			p->ssthresh = tcp_current_ssthresh(sk);
 			p->srtt = tp->srtt_us >> 3;
+			p->sowd_out = tp->owd_out.delay_us >> 3;
+			p->sowd_in = tp->owd_in.delay_us >> 3;
 
 			tcp_probe.head = (tcp_probe.head + 1) & (bufsize - 1);
 		}
@@ -191,11 +195,12 @@ static int tcpprobe_sprint(char *tbuf, int n)
 		= ktime_to_timespec64(ktime_sub(p->tstamp, tcp_probe.start));
 
 	return scnprintf(tbuf, n,
-			"%lu.%09lu %pISpc %pISpc %d %#x %#x %u %u %u %u %u\n",
+			"%lu.%09lu %pISpc %pISpc %d %#x %#x %u %u %u %u %u %u\n",
 			(unsigned long)ts.tv_sec,
 			(unsigned long)ts.tv_nsec,
 			&p->src, &p->dst, p->length, p->snd_nxt, p->snd_una,
-			p->snd_cwnd, p->ssthresh, p->snd_wnd, p->srtt, p->rcv_wnd);
+			p->snd_cwnd, p->ssthresh, p->snd_wnd, p->srtt,
+			p->sowd_out, p->sowd_in, p->rcv_wnd);
 }
 
 static ssize_t tcpprobe_read(struct file *file, char __user *buf,
