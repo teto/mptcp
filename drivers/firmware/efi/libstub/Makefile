@@ -72,7 +72,7 @@ quiet_cmd_stubcopy = STUBCPY $@
       cmd_stubcopy = if $(OBJCOPY) $(STUBCOPY_FLAGS-y) $< $@; then	\
 		     $(OBJDUMP) -r $@ | grep $(STUBCOPY_RELOC-y)	\
 		     && (echo >&2 "$@: absolute symbol references not allowed in the EFI stub"; \
-			 rm -f $@; /bin/false); else /bin/false; fi
+			 rm -f $@; false); else false; fi
 
 #
 # ARM discards the .data section because it disallows r/w data in the

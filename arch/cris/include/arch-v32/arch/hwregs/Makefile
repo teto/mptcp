@@ -67,7 +67,7 @@ REGDESC += $(BASEDIR)/io/timer/rtl/timer_regs.r
 
 BASEDIR = /n/asic/design
 DESIGNDIR = /n/asic/projects/guinness/design
-RDES2C = /n/asic/bin/rdes2c
+RDES2C = /n/asicrdes2c
 RDES2C = /n/asic/design/tools/rdesc/rdes2c
 RDES2INTR = /n/asic/design/tools/rdesc/rdes2intr
 RDES2TXT = /n/asic/design/tools/rdesc/rdes2txt

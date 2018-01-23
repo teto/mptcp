@@ -63,7 +63,7 @@ IOPROCREGDESC += $(IOPROCDIR)/iop_trigger_grp.r
 IOPROCREGDESC += $(IOPROCDIR)/guinness/iop_version.r
 
 
-RDES2C = /n/asic/bin/rdes2c
+RDES2C = /n/asicrdes2c
 RDES2C = /n/asic/design/tools/rdesc/rdes2c
 RDES2INTR = /n/asic/design/tools/rdesc/rdes2intr
 RDES2TXT = /n/asic/design/tools/rdesc/rdes2txt

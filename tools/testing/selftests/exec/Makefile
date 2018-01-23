@@ -6,7 +6,7 @@ all: $(BINARIES) $(DEPS)
 subdir:
 	mkdir -p $@
 script:
-	echo '#!/bin/sh' > $@
+	echo '#!sh' > $@
 	echo 'exit $$*' >> $@
 	chmod +x $@
 execveat.symlink: execveat

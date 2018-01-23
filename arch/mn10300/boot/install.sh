@@ -1,4 +1,4 @@
-#!/bin/sh
+#!sh
 #
 # arch/mn10300/boot/install -c.sh
 #

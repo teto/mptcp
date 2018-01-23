@@ -35,11 +35,11 @@ SOLIBEXT=so
 
 # The following works at least on fedora 23, you may need the next
 # line for other distros.
-ifneq (,$(wildcard /usr/sbin/update-java-alternatives))
-JDIR=$(shell /usr/sbin/update-java-alternatives -l | head -1 | awk '{print $$3}')
+ifneq (,$(wildcard /usrupdate-java-alternatives))
+JDIR=$(shell /usrupdate-java-alternatives -l | head -1 | awk '{print $$3}')
 else
-  ifneq (,$(wildcard /usr/sbin/alternatives))
-    JDIR=$(shell alternatives --display java | tail -1 | cut -d' ' -f 5 | sed 's%/jre/bin/java.%%g')
+  ifneq (,$(wildcard /usralternatives))
+    JDIR=$(shell alternatives --display java | tail -1 | cut -d' ' -f 5 | sed 's%/jrejava.%%g')
   endif
 endif
 ifndef JDIR

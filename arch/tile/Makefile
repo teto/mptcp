@@ -14,7 +14,7 @@
 # Only bother to test for a few common targets, to avoid useless errors.
 ifeq ($(CROSS_COMPILE),)
   ifdef TILERA_ROOT
-    CROSS_COMPILE := $(TILERA_ROOT)/bin/tile-
+    CROSS_COMPILE := $(TILERA_ROOT)tile-
   else
     goals := $(if $(MAKECMDGOALS), $(MAKECMDGOALS), all)
     ifneq ($(strip $(filter vmlinux modules all,$(goals))),)

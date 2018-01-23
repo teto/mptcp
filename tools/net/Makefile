@@ -30,6 +30,6 @@ clean :
 	rm -rf *.o bpf_jit_disasm bpf_dbg bpf_asm bpf_exp.yacc.* bpf_exp.lex.*
 
 install :
-	install bpf_jit_disasm $(prefix)/bin/bpf_jit_disasm
-	install bpf_dbg $(prefix)/bin/bpf_dbg
-	install bpf_asm $(prefix)/bin/bpf_asm
+	install bpf_jit_disasm $(prefix)bpf_jit_disasm
+	install bpf_dbg $(prefix)bpf_dbg
+	install bpf_asm $(prefix)bpf_asm

@@ -7,7 +7,7 @@
 quiet_cmd_gen_mach = GEN     $@
       cmd_gen_mach = mkdir -p $(dir $@) && \
 		     $(AWK) -f $(filter-out $(PHONY),$^) > $@ || \
-		     { rm -f $@; /bin/false; }
+		     { rm -f $@; false; }
 
 include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types FORCE
 	$(call if_changed,gen_mach)

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!sh
 #
 # arch/blackfin/boot/install.sh
 #
@@ -36,7 +36,7 @@ verify "$3"
 
 # User may have a custom install script
 
-if [ -x ~/bin/${INSTALLKERNEL} ]; then exec ~/bin/${INSTALLKERNEL} "$@"; fi
+if [ -x ~${INSTALLKERNEL} ]; then exec ~${INSTALLKERNEL} "$@"; fi
 if which ${INSTALLKERNEL} >/dev/null 2>&1; then
 	exec ${INSTALLKERNEL} "$@"
 fi

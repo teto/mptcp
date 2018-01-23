@@ -162,7 +162,7 @@ define archhelp
   echo  '  vmImage.lzo     - Kernel-only image for U-Boot (arch/$(ARCH)/boot/vmImage.lzo)'
   echo  '  vmImage.xip     - XIP Kernel-only image for U-Boot (arch/$(ARCH)/boot/vmImage.xip)'
   echo  '  install         - Install kernel using'
-  echo  '                     (your) ~/bin/$(INSTALLKERNEL) or'
+  echo  '                     (your) ~$(INSTALLKERNEL) or'
   echo  '                     (distribution) PATH: $(INSTALLKERNEL) or'
   echo  '                     install to $$(INSTALL_PATH)'
 endef

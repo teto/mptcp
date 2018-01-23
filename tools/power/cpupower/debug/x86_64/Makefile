@@ -6,7 +6,7 @@ endif
 DESTDIR =
 bindir  = /usr/bin
 
-INSTALL = /usr/bin/install
+INSTALL = install
 
 
 default: all

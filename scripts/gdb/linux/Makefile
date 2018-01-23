@@ -1,6 +1,6 @@
 always := gdb-scripts
 
-SRCTREE := $(shell cd $(srctree) && /bin/pwd)
+SRCTREE := $(shell cd $(srctree) && pwd)
 
 $(obj)/gdb-scripts:
 ifneq ($(KBUILD_SRC),)

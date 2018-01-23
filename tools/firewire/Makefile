@@ -16,4 +16,4 @@ clean :
 	rm -rf *.o nosy-dump
 
 install :
-	install nosy-dump $(prefix)/bin/nosy-dump
+	install nosy-dump $(prefix)nosy-dump

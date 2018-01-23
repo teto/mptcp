@@ -117,7 +117,7 @@ HOSTLOADLIBES_sampleip += -lelf
 HOSTLOADLIBES_tc_l2_redirect += -l elf
 
 # Allows pointing LLC/CLANG to a LLVM backend with bpf support, redefine on cmdline:
-#  make samples/bpf/ LLC=~/git/llvm/build/bin/llc CLANG=~/git/llvm/build/bin/clang
+#  make samples/bpf/ LLC=~/git/llvm/buildllc CLANG=~/git/llvm/buildclang
 LLC ?= llc
 CLANG ?= clang
 
