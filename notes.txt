@@ -1,0 +1,7 @@
+Negociatition
+
+tcp_timestamps
+1=random offset
+2=enabled
+3=wallclock + random offset
+4=wallclock
