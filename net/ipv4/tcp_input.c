@@ -5893,19 +5893,20 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		/* if extended mode, need to retrieve peer capabilities before the offset */
 		if (sysctl_tcp_timestamps > 2) {
 			/* In extended mode, synack ts.ecr should contain the server precision
-			 *
-			 * lsndtime */
+			/* lsndtime */
 			if (tp->rx_opt.rcv_tsecr == tp->lsndtime) {
-				printk ("server doesn't support extended ts it seems");
+				pr_info ("server doesn't support extended ts it seems");
 			} else {
 				tp->rx_opt.rcv_tsecr ^= tp->lsndtime;
 				tp->rx_opt.tstamp_extended = 1;
 
-				printk ("server supports extended ts with precision TODO");
+				pr_info ("server supports extended ts with precision TODO");
 			}
 				/* TODO set it to 0 */
 			/* tp->rx_opt.rcv_tsecr */
 		} else {
+
+			/* unconditionally substract tsoffset sine it is 0 when offeset disabled */
 			tp->rx_opt.rcv_tsecr -= tp->tsoffset;
 		}
 	}
@@ -6515,10 +6516,6 @@ static void tcp_openreq_init(struct request_sock *req,
 	skb_mstamp_get(&tcp_rsk(req)->snt_synack);
 	tcp_rsk(req)->last_oow_ack_time = 0;
 	req->mss = rx_opt->mss_clamp;
-	req->ts_recent = rx_opt->saw_tstamp ? rx_opt->rcv_tsval : 0;
-    ireq->tstamp_extended = rx_opt->saw_tstamp ?
-            (rx_opt->rcv_tsecr & TCP_TS_EXO_MASK ) : 0;
-    printk (KERN_INFO "ts accepted ? = %d", ireq->tstamp_extended);
 
 	ireq->tstamp_ok = rx_opt->tstamp_ok;
 	ireq->sack_ok = rx_opt->sack_ok;
@@ -6531,6 +6528,11 @@ static void tcp_openreq_init(struct request_sock *req,
 	ireq->ir_rmt_port = tcp_hdr(skb)->source;
 	ireq->ir_num = ntohs(tcp_hdr(skb)->dest);
 	ireq->ir_mark = inet_request_mark(sk, skb);
+	req->ts_recent = rx_opt->tstamp_ok ? rx_opt->rcv_tsval : 0;
+    ireq->tstamp_extended = rx_opt->saw_tstamp ?
+            (rx_opt->rcv_tsecr & TCP_TS_EXO_MASK ) : 0;
+    printk (KERN_INFO "ts_extended accepted=%d. Received rx_opt->rcv_tsecr=%u",
+			ireq->tstamp_extended, rx_opt->rcv_tsecr);
 }
 
 struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,

@@ -540,35 +540,29 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 
 /*
 https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
-*/
-int tcp_ts_interval (void)
-{
-       /* for now we assume both kernels have similar precision */
-       return 0;
-}
-
-/**
  * follows the specs in "encoding of timestamp intervals"
  * 0x4432
  * returns 0 in case of an error
- */
-/* un tcp_clock_resolution()*/
-/* {*/
-/*     struct timespec res;*/
-    /* CLOCK_REALTIME is not monotonic, it can be set back by ntp
+   * CLOCK_REALTIME is not monotonic, it can be set back by ntp
      * CLOCK_MONOTONIC should be good but not for OWDs
      * CLOCK_MONOTONIC_RAW is less precise but faster
-     */
-/*     int res = clock_getres( CLOCK_REALTIME, &res):*/
-/*     if (res != 0) {*/
-/*             return 0;*/
-/*     }*/
-/*     printk(*/
-/*     pr_devel_once*/
-/*     pr_debug()*/
-/*     res.tv_nsec;*/
+	 */
+int tcp_ts_interval (void)
+{
+	/* for now we assume both kernels have similar precision
+	* We need to set it to a value bigger than 1 else
+	* extended timestamps will get disabled
+	*/
+	/* 	long		tv_nsec;		/1* nanoseconds *1/ */
+		/* USER_HZ */
+	/* #define tcp_time_stamp		((__u32)(jiffies)) */
+	/* clocksource_default_clock () */
+    /* int res = clock_getres(CLOCK_REALTIME, &precision): this is userspace code */
+	long ns_prec = 1/CLOCKS_PER_SEC * 1000000000;
 
-/* }*/
+	pr_debug("clock precision of %ld", ns_prec);
+	return ns_prec;
+}
 
 
 /* Compute TCP options for SYN packets. This is not the final
