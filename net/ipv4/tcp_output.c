@@ -542,25 +542,17 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
  * follows the specs in "encoding of timestamp intervals"
  * 0x4432
- * returns 0 in case of an error
-   * CLOCK_REALTIME is not monotonic, it can be set back by ntp
-     * CLOCK_MONOTONIC should be good but not for OWDs
-     * CLOCK_MONOTONIC_RAW is less precise but faster
-	 */
-int tcp_ts_interval (void)
+*/
+u32 tcp_ts_interval (void)
 {
 	/* for now we assume both kernels have similar precision
 	* We need to set it to a value bigger than 1 else
 	* extended timestamps will get disabled
 	*/
-	/* 	long		tv_nsec;		/1* nanoseconds *1/ */
-		/* USER_HZ */
-	/* #define tcp_time_stamp		((__u32)(jiffies)) */
-	/* clocksource_default_clock () */
-    /* int res = clock_getres(CLOCK_REALTIME, &precision): this is userspace code */
-	long ns_prec = 1/CLOCKS_PER_SEC * 1000000000;
+	/* long ns_prec = 1/CLOCKS_PER_SEC * 1000000000; */
+	u32 ns_prec = ktime_get_resolution_ns();
 
-	pr_debug("clock precision of %ld", ns_prec);
+	pr_debug("clock precision of %u", ns_prec);
 	return ns_prec;
 }
 
@@ -602,16 +594,20 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 		opts->options |= OPTION_TS;
 		opts->tsval = tcp_skb_timestamp(skb) + tp->tsoffset;
 		opts->tsecr = tp->rx_opt.ts_recent;
-		if (opts->tsecr == 0 && sysctl_tcp_timestamps > 2) {
-				/* we set the EXO = extended option (1 bit)
-					* defined in "additional negotiation in the TCP Timestamp Option field during the TCP handshake" draft
-					* version is on 2 bits (0 for now)
-					*/
-				opts->tsecr = TCP_TS_EXO_MASK | tcp_ts_interval();
+
+
+		if (sysctl_tcp_timestamps > 2) {
+			/* we set the EXO = extended option (1 bit)
+				* defined in "additional negotiation in the TCP Timestamp Option field during the TCP handshake" draft
+				* version is on 2 bits (0 for now)
+			*/
+			WARN_ON(opts->tsecr == 0);
+			opts->tsecr = TCP_TS_EXO_MASK | tcp_ts_interval();
+			pr_info("%s: adding tsecr=%u to SYN", __func__, opts->tsecr);
 
 		} else {
 			/* that's 0 */
-			printk(KERN_WARNING "tsecr is not null %u", opts->tsecr);
+			pr_warn("%s tsecr is not null %u", __func__, opts->tsecr);
 		}
 
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
@@ -688,8 +684,11 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
 				/* return sender tsval XOR our config. why the xor ? for middlebox ? */
 				/* maybe it should be called EXO_BIT */
-			printk ("synACK crafted with extended ts");
 			opts->tsecr = req->ts_recent ^ (TCP_TS_EXO_MASK | tcp_ts_interval());
+			mptcp_debug ("synACK crafted with extended ts, reusing syn tsval=%u, sending tsecr=%u", 
+					req->ts_recent, opts->tsecr);
+		} else {
+			pr_warn ("no ts_extended in synack: ireq->tstamp_extended=%u", ireq->tstamp_extended);
 		}
 
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;

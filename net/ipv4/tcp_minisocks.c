@@ -568,6 +568,7 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 
 		if (newtp->rx_opt.tstamp_ok) {
 			// todo might need a change
+			/* mptcp_debug("setting ts_recent_stamp to "); */
 			newtp->rx_opt.ts_recent = req->ts_recent;
 			newtp->rx_opt.ts_recent_stamp = get_seconds();
 			newtp->tcp_header_len = sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
@@ -778,7 +779,7 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	if (tmp_opt.saw_tstamp && !after(TCP_SKB_CB(skb)->seq, tcp_rsk(req)->rcv_nxt)) {
 		req->ts_recent = tmp_opt.rcv_tsval;
 		if (sysctl_tcp_timestamps > 2) {
-			pr_info("Connection request: setting tsecr to %u", tmp_opt.rcv_tsecr);
+			mptcp_debug("%s: Connection request: setting tsecr to %u", __func__, tmp_opt.rcv_tsecr);
 			req->ts_ecr = tmp_opt.rcv_tsecr;
 		}
 	}

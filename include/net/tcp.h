@@ -832,6 +832,7 @@ void tcp_send_window_probe(struct sock *sk);
  * casts with the following macro.
  */
 #define tcp_time_stamp		((__u32)(jiffies))
+/* MATT here we redefine tcp_time_stamp */
 
 static inline u32 tcp_skb_timestamp(const struct sk_buff *skb)
 {
