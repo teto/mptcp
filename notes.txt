@@ -6,6 +6,9 @@ tcp_timestamps
 3=wallclock + random offset
 4=wallclock
 
+struct tcp_options_received {
+	long	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
+	u32	ts_recent;	/* Time stamp to echo next		*/
 
 In timekeeping.c c la d ou je peux recuperer le temps rapidement
 ktime_get_real_seconds 
@@ -17,3 +20,15 @@ ktime_get_resolution_ns
  * sent in the syn-ack.
  * Since subsequent timestamps use the normal tcp_time_stamp value, we
  * must make sure that the resulting initial timestamp is <= tcp_time_stamp.
+
+TODO 
+- adapt for RTTs tcp_synack_rtt_meas/tcp_update_rtt_min/tcp_rtt_estimator
+
+
+tcp_v4_syn_recv_sock is called once 3WHS has completed
+tcp_synack_rtt_meas
+
+tcp_synack_rtt_meas
+tcp_synack_rtt_meas
+Listening procedure:
+tcp_rcv_state_process( "if (sk->sk_state == TCP_NEW_SYN_RECV)" ) -> tcp_conn_request -> tcp_openreq_init

@@ -138,7 +138,7 @@ struct tcp_out_options {
 #define TCP_FACK_ENABLED  (1 << 1)   /*1 = FACK is enabled locally*/
 #define TCP_DSACK_SEEN    (1 << 2)   /*1 = DSACK was received from peer*/
 
-#define TCP_TS_EXO_MASK    (1 << 31)
+#define TCP_TS_EXO_MASK    (1 << 31) /* most significant bit of the tcp timestamp */
 
 struct tcp_options_received {
 /*	PAWS/RTTM data	*/
@@ -245,6 +245,7 @@ struct tcp_sock {
  	u32	snd_una;	/* First byte we want an ack for	*/
  	u32	snd_sml;	/* Last byte of the most recently transmitted small packet */
 	u32	rcv_tstamp;	/* timestamp of last received ACK (for keepalives) */
+					/* /!\ we hijack its meaning in tcp_syn_options */
 	u32	lsndtime;	/* timestamp of last sent data packet (for restart window) */
 	u32	last_oow_ack_time;  /* timestamp of last out-of-window ACK */
 
@@ -308,9 +309,8 @@ struct tcp_sock {
 
 		struct  minmax rtt_min;
 	} owd_out, owd_in;
+	/* u32 syn_ts; /1* save the initial syn *1/ */
 
-	/* struct tcp_delay_est owd_out; /1* forward OWD estimation *1/ */
-	/* struct tcp_delay_est owd_in;  /1* backward OWD estimation *1/ */
 
 	u32	srtt_us;	/* smoothed round trip time << 3 in usecs */
 	u32	mdev_us;	/* medium deviation			*/

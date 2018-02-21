@@ -538,11 +538,10 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		mptcp_options_write(ptr, tp, opts, skb);
 }
 
-/*
-https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
+/* https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
  * follows the specs in "encoding of timestamp intervals"
- * 0x4432
-*/
+ * strictly positive
+ */
 u32 tcp_ts_interval (void)
 {
 	/* for now we assume both kernels have similar precision
@@ -553,7 +552,8 @@ u32 tcp_ts_interval (void)
 	u32 ns_prec = ktime_get_resolution_ns();
 
 	pr_debug("clock precision of %u", ns_prec);
-	return ns_prec;
+	/* return max_t(u32, ns_prec, 1); */
+	return 1;
 }
 
 
@@ -595,14 +595,13 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 		opts->tsval = tcp_skb_timestamp(skb) + tp->tsoffset;
 		opts->tsecr = tp->rx_opt.ts_recent;
 
-
 		if (sysctl_tcp_timestamps > 2) {
-			/* we set the EXO = extended option (1 bit)
-				* defined in "additional negotiation in the TCP Timestamp Option field during the TCP handshake" draft
-				* version is on 2 bits (0 for now)
-			*/
-			WARN_ON(opts->tsecr == 0);
+			/* we set the EXO = extended option (1 bit) */
+			WARN(opts->tsecr != 0, "tsecr should not be null");
 			opts->tsecr = TCP_TS_EXO_MASK | tcp_ts_interval();
+			/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer */
+			tp->rcv_tstamp = opts->tsval;
+
 			pr_info("%s: adding tsecr=%u to SYN", __func__, opts->tsecr);
 
 		} else {
@@ -682,11 +681,10 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 		opts->tsecr = req->ts_recent;
 
 		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
-				/* return sender tsval XOR our config. why the xor ? for middlebox ? */
-				/* maybe it should be called EXO_BIT */
+			/* return sender tsval XOR our config. */
 			opts->tsecr = req->ts_recent ^ (TCP_TS_EXO_MASK | tcp_ts_interval());
-			mptcp_debug ("synACK crafted with extended ts, reusing syn tsval=%u, sending tsecr=%u", 
-					req->ts_recent, opts->tsecr);
+			mptcp_debug ("%s: extended ts, reusing syn tsval=%u, sending tsecr=%u",
+					__func__, req->ts_recent, opts->tsecr);
 		} else {
 			pr_warn ("no ts_extended in synack: ireq->tstamp_extended=%u", ireq->tstamp_extended);
 		}
@@ -3503,6 +3501,7 @@ int tcp_connect(struct sock *sk)
 	if (inet_csk(sk)->icsk_af_ops->rebuild_header(sk))
 		return -EHOSTUNREACH; /* Routing failure or similar. */
 
+	mptcp_debug ("%s", __func__);
 	tcp_connect_init(sk);
 
 	if (unlikely(tp->repair)) {

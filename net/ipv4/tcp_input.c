@@ -3945,9 +3945,16 @@ void tcp_parse_options(const struct sk_buff *skb,
 				if ((opsize == TCPOLEN_TIMESTAMP) &&
 				    ((estab && opt_rx->tstamp_ok) ||
 				     (!estab && sysctl_tcp_timestamps))) {
+					/* mptcp_debug("parsing with sysctl_tcp_timestamps=%d", sysctl_tcp_timestamps); */
 					opt_rx->saw_tstamp = 1;
 					opt_rx->rcv_tsval = get_unaligned_be32(ptr);
 					opt_rx->rcv_tsecr = get_unaligned_be32(ptr + 4);
+
+					/* mptcp_debug("tsval=%u (%u) tsecr=%u (%u) ", */
+					/* 		opt_rx->rcv_tsval, opt_rx->rcv_tsecr, */
+					/* 		ntohl(opt_rx->rcv_tsval), */
+					/* 		ntohl(opt_rx->rcv_tsecr) */
+					/* 		); */
 					/* the logic part should be in state-specific functions, don't modify here */
 				}
 				break;
@@ -5876,6 +5883,7 @@ static bool tcp_rcv_fastopen_synack(struct sock *sk, struct sk_buff *synack,
 	return false;
 }
 
+/* used for both synsent/synack I think */
 static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 					 const struct tcphdr *th)
 {
@@ -5892,16 +5900,19 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		/* if extended mode, need to retrieve peer capabilities before the offset */
 		if (sysctl_tcp_timestamps > 2) {
+			mptcp_debug ("%s: checking extended ts support, ", __func__);
 			/* In extended mode, synack ts.ecr should contain the server precision lsndtime */
-			if (tp->rx_opt.rcv_tsecr == tp->lsndtime) {
-				mptcp_debug ("%s: client doesn't support extended ts it seems", __func__);
+			if (tp->rx_opt.rcv_tsecr == tp->rcv_tstamp) {
+				mptcp_debug ("%s: peer doesn't support extended ts, it echoed back %u", __func__, tp->rx_opt.rcv_tsecr);
+				tp->rx_opt.rcv_tsecr -= tp->tsoffset;
 			} else {
-				tp->rx_opt.rcv_tsecr ^= tp->lsndtime;
+				/* we hijacked rcp_stamp to save our syn tsval */
+				tp->rx_opt.rcv_tsecr ^= tp->rcv_tstamp;
 				tp->rx_opt.tstamp_extended = 1;
 
 				/* Save the precision  ? */
-				mptcp_debug ("%s: server supports extended ts with precision (ns) %u",
-					__func__, tp->rx_opt.rcv_tsecr);
+				mptcp_debug ("%s: peer supports extended ts with precision (ns) %u. tp->rx_opt.rcv_tsecr=%u",
+					__func__, (TCP_TS_EXO_MASK ^ tp->rx_opt.rcv_tsecr), tp->rx_opt.rcv_tsecr);
 			}
 			/* TODO set it to 0 */
 			/* tp->rx_opt.rcv_tsecr */
@@ -6013,6 +6024,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			tp->tcp_header_len =
 				sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
 			tp->advmss	    -= TCPOLEN_TSTAMP_ALIGNED;
+			mptcp_debug("this part was left untouched");
 			tcp_store_ts_recent(tp);
 		} else {
 			tp->tcp_header_len = sizeof(struct tcphdr);
@@ -6517,7 +6529,7 @@ static void tcp_openreq_init(struct request_sock *req,
 	skb_mstamp_get(&tcp_rsk(req)->snt_synack);
 	tcp_rsk(req)->last_oow_ack_time = 0;
 	req->mss = rx_opt->mss_clamp;
-
+	req->ts_recent = rx_opt->saw_tstamp ? rx_opt->rcv_tsval : 0;
 	ireq->tstamp_ok = rx_opt->tstamp_ok;
 	ireq->sack_ok = rx_opt->sack_ok;
 	ireq->snd_wscale = rx_opt->snd_wscale;
@@ -6529,12 +6541,11 @@ static void tcp_openreq_init(struct request_sock *req,
 	ireq->ir_rmt_port = tcp_hdr(skb)->source;
 	ireq->ir_num = ntohs(tcp_hdr(skb)->dest);
 	ireq->ir_mark = inet_request_mark(sk, skb);
-	req->ts_recent = rx_opt->tstamp_ok ? rx_opt->rcv_tsval : 0;
-	/* seems like saw_tstamp might be 0 here */
+	/* en fait c le rcv_tsecr */
     ireq->tstamp_extended = rx_opt->tstamp_ok ?
-            (rx_opt->rcv_tsecr & TCP_TS_EXO_MASK ) : 0;
-    printk (KERN_INFO "tstamp_ok=%u ts_extended accepted=%d. Received rx_opt->rcv_tsecr=%u, stored ts_recent=%u",
-			ireq->tstamp_ok, ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent);
+            ( (rx_opt->rcv_tsecr & TCP_TS_EXO_MASK) != 0) : 0;
+    mptcp_debug ("ts_extended accepted=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u",
+			ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent);
 }
 
 struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,
@@ -6662,10 +6673,15 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	tmp_opt.user_mss  = tp->rx_opt.user_mss;
 	tcp_parse_options(skb, &tmp_opt, NULL, 0, want_cookie ? NULL : &foc, NULL);
 
+	/* mptcp_debug("%s: saw_tstamp=%d after parsing options tsval: %u tsecr: %u", */
+	/* 		__func__, tmp_opt.saw_tstamp, tmp_opt.rcv_tsval, tmp_opt.rcv_tsecr); */
+
 	if (want_cookie && !tmp_opt.saw_tstamp)
 		tcp_clear_options(&tmp_opt);
 
 	tmp_opt.tstamp_ok = tmp_opt.saw_tstamp;
+	mptcp_debug("%s: tmp_opt.tstamp_ok=%d after parsing options tsecr: %u",
+			__func__, tmp_opt.tstamp_ok, tmp_opt.rcv_tsecr);
 	tcp_openreq_init(req, &tmp_opt, skb, sk);
 	inet_rsk(req)->no_srccheck = inet_sk(sk)->transparent;
 
