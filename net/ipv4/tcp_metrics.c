@@ -432,6 +432,12 @@ void tcp_update_metrics(struct sock *sk)
 		tcp_metric_set(tm, TCP_METRIC_RTTVAR, var);
 	}
 
+
+	/* TODO do sthg similar for OWDs
+	 * should we init at RTT/2 ? */
+	/* rtt = tcp_metric_get(tm, TCP_METRIC_RTT); */
+	/* m = rtt - tp->srtt_us; */
+
 	if (tcp_in_initial_slowstart(tp)) {
 		/* Slow start still did not finish. */
 		if (!tcp_metric_locked(tm, TCP_METRIC_SSTHRESH)) {

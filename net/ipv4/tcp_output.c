@@ -599,8 +599,8 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 			/* we set the EXO = extended option (1 bit) */
 			WARN(opts->tsecr != 0, "tsecr should not be null");
 			opts->tsecr = TCP_TS_EXO_MASK | tcp_ts_interval();
-			/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer */
-			tp->rcv_tstamp = opts->tsval;
+			/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
+			 * look at retrans_stamp instead */
 
 			pr_info("%s: adding tsecr=%u to SYN", __func__, opts->tsecr);
 
@@ -742,8 +742,14 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		opts->options |= OPTION_TS;
 		/// we might need more precisions there
 		opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0;
+		if (unlikely(tp->rx_opt.tstamp_extended)) {
+			getnstimeofday64
+			ktime_get_resolution_ns
+			opts->tsval =  + tp->tsoffset : 0;
+		}
 
-		/* In extended mode, the ts_recent value was changed to the forward OWD
+		/* In extended mode, the ts_recent value was already changed to the
+		 * forward OWD in tcp_store_ts_recent
 		 */
 		opts->tsecr = tp->rx_opt.ts_recent;
 

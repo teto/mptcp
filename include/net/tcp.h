@@ -832,7 +832,26 @@ void tcp_send_window_probe(struct sock *sk);
  * casts with the following macro.
  */
 #define tcp_time_stamp		((__u32)(jiffies))
-/* MATT here we redefine tcp_time_stamp */
+
+/* MATT here we redefine tcp_time_stamp
+ * a list of candidates */
+/* ktime_get_real_seconds
+getnstimeofday64
+current_kernel_time64
+current_kernel_time
+timekeeping_get_ns NO
+ktime_get_raw_fast_ns
+ktime_get_mono_fast_ns
+ktime_get_ts64
+ktime_get_raw
+ktime_get_resolution_ns ( 	WARN_ON(timekeeping_suspended); )
+*/
+/* TODO need to return 32 bits */
+/* #define tcp_time_stamp_extended */
+/* only fits 32 bits */
+static inline u32 tcp_time_stamp_extended (void) {
+	/* TODO */
+}
 
 static inline u32 tcp_skb_timestamp(const struct sk_buff *skb)
 {

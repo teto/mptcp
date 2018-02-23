@@ -6,6 +6,9 @@ tcp_timestamps
 3=wallclock + random offset
 4=wallclock
 
+
+tp->retrans_stamp is used in syn
+
 struct tcp_options_received {
 	long	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
 	u32	ts_recent;	/* Time stamp to echo next		*/
@@ -13,7 +16,15 @@ struct tcp_options_received {
 In timekeeping.c c la d ou je peux recuperer le temps rapidement
 ktime_get_real_seconds 
 getnstimeofday64
-ktime_get_resolution_ns
+current_kernel_time64
+current_kernel_time
+timekeeping_get_ns
+ktime_get_raw_fast_ns
+ktime_get_mono_fast_ns
+ktime_get_ts64
+ktime_get_raw
+ktime_get_resolution_ns ( 	WARN_ON(timekeeping_suspended); )
+
 
  * when syncookies are in effect and tcp timestamps are enabled we encode
  * tcp options in the lower bits of the timestamp value that will be

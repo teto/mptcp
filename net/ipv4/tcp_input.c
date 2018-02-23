@@ -3588,24 +3588,25 @@ static void tcp_send_challenge_ack(struct sock *sk, const struct sk_buff *skb)
 	}
 }
 
-/* the ts_recent stuff might break with extended ts */
+/* the ts_recent stuff might break with extended ts
+ * store the last seen timestamp */
 static void tcp_store_ts_recent(struct tcp_sock *tp)
 {
 	/* In extended mode, the ts_recent value is changed to the forward OWD
 	 * also updates
 	 */
-	if (tp->rx_opt.tstamp_extended) {
+	/* if (tp->rx_opt.tstamp_extended) {*/
 		/* printk ("Storing recent value");
 		 * computes OWD, updates the value too
 		 */
-		tp->rx_opt.ts_recent = tcp_time_stamp - tp->rx_opt.rcv_tsval;
-		tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);
+	/* 	tp->rx_opt.ts_recent = tcp_time_stamp - tp->rx_opt.rcv_tsval;*/
+	/* 	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);*/
 		/* check it 's not 0 */
-		tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr);
+	/* 	tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr);*/
 
-	} else {
+	/* } else {*/
 		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
-	}
+	/* } */
 	tp->rx_opt.ts_recent_stamp = get_seconds();
 }
 
@@ -5902,9 +5903,10 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		if (sysctl_tcp_timestamps > 2) {
 			mptcp_debug ("%s: checking extended ts support, ", __func__);
 			/* In extended mode, synack ts.ecr should contain the server precision lsndtime */
-			if (tp->rx_opt.rcv_tsecr == tp->rcv_tstamp) {
+			/*  rcv_tstamp */
+			if (tp->rx_opt.rcv_tsecr == tp->retrans_stamp) {
 				mptcp_debug ("%s: peer doesn't support extended ts, it echoed back %u", __func__, tp->rx_opt.rcv_tsecr);
-				tp->rx_opt.rcv_tsecr -= tp->tsoffset;
+				/* tp->rx_opt.rcv_tsecr -= tp->tsoffset; */
 			} else {
 				/* we hijacked rcp_stamp to save our syn tsval */
 				tp->rx_opt.rcv_tsecr ^= tp->rcv_tstamp;
@@ -5913,14 +5915,16 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 				/* Save the precision  ? */
 				mptcp_debug ("%s: peer supports extended ts with precision (ns) %u. tp->rx_opt.rcv_tsecr=%u",
 					__func__, (TCP_TS_EXO_MASK ^ tp->rx_opt.rcv_tsecr), tp->rx_opt.rcv_tsecr);
+
+				/* restore the expected value by PAWS a few lines below */
+				tp->rx_opt.rcv_tsecr = tp->retrans_stamp;
 			}
 			/* TODO set it to 0 */
 			/* tp->rx_opt.rcv_tsecr */
-		} else {
+		} 
 
-			/* unconditionally substract tsoffset sine it is 0 when offeset disabled */
-			tp->rx_opt.rcv_tsecr -= tp->tsoffset;
-		}
+		/* unconditionally substract tsoffset sine it is 0 when offeset disabled */
+		tp->rx_opt.rcv_tsecr -= tp->tsoffset;
 	}
 
 	if (th->ack) {
@@ -5937,8 +5941,11 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			goto reset_and_undo;
 
 		if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr &&
+			/* */
+			/* !tp->rx_opt.tstamp_extended && */
 		    !between(tp->rx_opt.rcv_tsecr, tp->retrans_stamp,
 			     tcp_time_stamp)) {
+			pr_warn ("%s: killing connection because of PAWS %u", __func__, tp->retrans_stamp);
 			NET_INC_STATS(sock_net(sk),
 					LINUX_MIB_PAWSACTIVEREJECTED);
 			goto reset_and_undo;
@@ -6024,7 +6031,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			tp->tcp_header_len =
 				sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
 			tp->advmss	    -= TCPOLEN_TSTAMP_ALIGNED;
-			mptcp_debug("this part was left untouched");
+			mptcp_debug("%s: this part was left untouched", __func__);
 			tcp_store_ts_recent(tp);
 		} else {
 			tp->tcp_header_len = sizeof(struct tcphdr);

@@ -777,6 +777,7 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	/* In sequence, PAWS is OK. */
 
 	if (tmp_opt.saw_tstamp && !after(TCP_SKB_CB(skb)->seq, tcp_rsk(req)->rcv_nxt)) {
+		req->ts_recent = tmp_opt.rcv_tsval;
 
 		/* a few lines before we have tmp_opt.ts_recent = req->ts_recent; */
 		/* TODO change */
