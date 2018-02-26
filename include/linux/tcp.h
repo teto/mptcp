@@ -148,7 +148,9 @@ struct tcp_options_received {
 	u32	rcv_tsecr;	/* raw Time stamp echo reply        	*/
 	u16 	saw_tstamp : 1,	/* Saw TIMESTAMP on last packet		*/
 		tstamp_ok : 1,	/* TIMESTAMP seen on SYN packet		*/
-		tstamp_extended : 1,    /* Extended timestamp has been negociated */
+		tstamp_extended : 3,    /* Extended timestamp version number
+								(0 if not negociated, 1 => with offset, 2 => without offset)
+								(TODO rename to tstamp_version, merge with tstamp_ok ?) */
 		dsack : 1,	/* D-SACK is scheduled			*/
 		wscale_ok : 1,	/* Wscale seen on SYN packet		*/
 		sack_ok : 4,	/* SACK seen on SYN packet		*/

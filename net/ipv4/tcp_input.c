@@ -5908,13 +5908,13 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 				mptcp_debug ("%s: peer doesn't support extended ts, it echoed back %u", __func__, tp->rx_opt.rcv_tsecr);
 				/* tp->rx_opt.rcv_tsecr -= tp->tsoffset; */
 			} else {
-				/* we hijacked rcp_stamp to save our syn tsval */
-				tp->rx_opt.rcv_tsecr ^= tp->rcv_tstamp;
-				tp->rx_opt.tstamp_extended = 1;
+				/* TODO remove we hijacked rcp_stamp to save our syn tsval */
+				tp->rx_opt.rcv_tsecr ^= tp->retrans_stamp;
+				tp->rx_opt.tstamp_extended = ((0x6f000000 & tp->rx_opt.rcv_tsecr) >> 29 )+ 1;
 
 				/* Save the precision  ? */
-				mptcp_debug ("%s: peer supports extended ts with precision (ns) %u. tp->rx_opt.rcv_tsecr=%u",
-					__func__, (TCP_TS_EXO_MASK ^ tp->rx_opt.rcv_tsecr), tp->rx_opt.rcv_tsecr);
+				mptcp_debug ("%s: peer supports extended ts version=%u with precision (ns) %u. tp->rx_opt.rcv_tsecr=%u",
+					__func__, tp->rx_opt.tstamp_extended, (tp->rx_opt.rcv_tsecr), tp->rx_opt.rcv_tsecr);
 
 				/* restore the expected value by PAWS a few lines below */
 				tp->rx_opt.rcv_tsecr = tp->retrans_stamp;
@@ -6548,10 +6548,13 @@ static void tcp_openreq_init(struct request_sock *req,
 	ireq->ir_rmt_port = tcp_hdr(skb)->source;
 	ireq->ir_num = ntohs(tcp_hdr(skb)->dest);
 	ireq->ir_mark = inet_request_mark(sk, skb);
-	/* en fait c le rcv_tsecr */
-    ireq->tstamp_extended = rx_opt->tstamp_ok ?
-            ( (rx_opt->rcv_tsecr & TCP_TS_EXO_MASK) != 0) : 0;
-    mptcp_debug ("ts_extended accepted=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u",
+	/* 1/ check timestamps are enabled
+	 * 2/ retrieve the version number
+	 */
+    ireq->tstamp_extended = (rx_opt->tstamp_ok && (rx_opt->rcv_tsecr & TCP_TS_EXO_MASK))
+		/* + 1 so that it's not 0 even when version is 0 */
+		? ((rx_opt->rcv_tsecr & 0x6f000000) >> 29) + 1 : 0;
+    mptcp_debug ("ts_extended version=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u",
 			ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent);
 }
 

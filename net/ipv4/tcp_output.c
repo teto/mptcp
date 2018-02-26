@@ -104,6 +104,30 @@ static inline __u32 tcp_acceptable_seq(const struct sock *sk)
 		return tcp_wnd_end(tp);
 }
 
+/* https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
+ * follows the specs in "encoding of timestamp intervals"
+ * strictly positive
+ */
+static inline u32 tcp_ts_interval (void)
+{
+	/* for now we assume both kernels have similar precision
+	* We need to set it to a value bigger than 1 else
+	* extended timestamps will get disabled
+	*/
+	/* long ns_prec = 1/CLOCKS_PER_SEC * 1000000000; */
+	u32 ns_prec = ktime_get_resolution_ns();
+
+	pr_debug("clock precision of %u", ns_prec);
+	/* return max_t(u32, ns_prec, 1); */
+	return 1;
+}
+
+
+static inline __u32 tcp_timestamp_extended_option(void)
+{
+	return TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x1fff & tcp_ts_interval());
+}
+
 /* Calculate mss to advertise in SYN segment.
  * RFC1122, RFC1063, draft-ietf-tcpimpl-pmtud-01 state that:
  *
@@ -538,24 +562,6 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		mptcp_options_write(ptr, tp, opts, skb);
 }
 
-/* https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
- * follows the specs in "encoding of timestamp intervals"
- * strictly positive
- */
-u32 tcp_ts_interval (void)
-{
-	/* for now we assume both kernels have similar precision
-	* We need to set it to a value bigger than 1 else
-	* extended timestamps will get disabled
-	*/
-	/* long ns_prec = 1/CLOCKS_PER_SEC * 1000000000; */
-	u32 ns_prec = ktime_get_resolution_ns();
-
-	pr_debug("clock precision of %u", ns_prec);
-	/* return max_t(u32, ns_prec, 1); */
-	return 1;
-}
-
 
 /* Compute TCP options for SYN packets. This is not the final
  * network wire format yet.
@@ -598,8 +604,10 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 		if (sysctl_tcp_timestamps > 2) {
 			/* we set the EXO = extended option (1 bit) */
 			WARN(opts->tsecr != 0, "tsecr should not be null");
-			opts->tsecr = TCP_TS_EXO_MASK | tcp_ts_interval();
-			/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
+			// write an inline function
+			/* opts->tsecr = TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x1fff & tcp_ts_interval()); */
+			opts->tsecr = tcp_timestamp_extended_option();
+				/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
 			 * look at retrans_stamp instead */
 
 			pr_info("%s: adding tsecr=%u to SYN", __func__, opts->tsecr);
@@ -682,7 +690,7 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 
 		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
 			/* return sender tsval XOR our config. */
-			opts->tsecr = req->ts_recent ^ (TCP_TS_EXO_MASK | tcp_ts_interval());
+			opts->tsecr = req->ts_recent ^ tcp_timestamp_extended_option();
 			mptcp_debug ("%s: extended ts, reusing syn tsval=%u, sending tsecr=%u",
 					__func__, req->ts_recent, opts->tsecr);
 		} else {
@@ -742,10 +750,11 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		opts->options |= OPTION_TS;
 		/// we might need more precisions there
 		opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0;
+
 		if (unlikely(tp->rx_opt.tstamp_extended)) {
-			getnstimeofday64
-			ktime_get_resolution_ns
-			opts->tsval =  + tp->tsoffset : 0;
+			/* getnstimeofday64 */
+			/* ktime_get_resolution_ns */
+			opts->tsval = tcp_time_stamp_extended() + tp->tsoffset;
 		}
 
 		/* In extended mode, the ts_recent value was already changed to the
