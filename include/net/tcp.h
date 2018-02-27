@@ -852,11 +852,14 @@ ktime_get_resolution_ns ( 	WARN_ON(timekeeping_suspended); )
 /* TODO pass a bool to know if we need an absolute or relative owd 
  * we might choose to use different fast/slow functions
  * */
-static inline u32 tcp_time_stamp_extended (void) {
-	/* TODO */
-	/* struct timespec64 ts; */
-	/* getnstimeofday64(&ts); */
-	return 42;
+
+#define tcp_time_stamp_extended		((__u32)(tcp_time_stamp_extended_func()))
+
+static inline u32 tcp_time_stamp_extended_func (void) {
+	struct timespec64 ts;
+	getnstimeofday64(&ts);
+	return ts.tv_nsec;
+	/* ktime_get_ts64 */
 }
 
 static inline u32 tcp_skb_timestamp(const struct sk_buff *skb)

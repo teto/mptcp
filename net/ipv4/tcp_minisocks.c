@@ -775,16 +775,16 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	}
 
 	/* In sequence, PAWS is OK. */
-
+	/* SYN_RECV mode a priori */
 	if (tmp_opt.saw_tstamp && !after(TCP_SKB_CB(skb)->seq, tcp_rsk(req)->rcv_nxt)) {
 		req->ts_recent = tmp_opt.rcv_tsval;
 
 		/* a few lines before we have tmp_opt.ts_recent = req->ts_recent; */
 		/* TODO change */
-		req->ts_recent = 42;
+		/* req->ts_recent = 42; */
 		if (sysctl_tcp_timestamps > 2) {
 			mptcp_debug("%s: Connection request: setting tsecr to %u", __func__, tmp_opt.rcv_tsecr);
-			req->ts_ecr = tmp_opt.rcv_tsecr;
+			req->ts_recent = tcp_time_stamp_extended - tmp_opt.rcv_tsval;
 			/* SYN_RCVD so should already be ok ? req->tstamp_extended = 1; */
 		}
 	}

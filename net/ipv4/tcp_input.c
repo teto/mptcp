@@ -3589,24 +3589,27 @@ static void tcp_send_challenge_ack(struct sock *sk, const struct sk_buff *skb)
 }
 
 /* the ts_recent stuff might break with extended ts
- * store the last seen timestamp */
+ * store the last seen timestamp 
+ * this is used in established mode only
+ */
 static void tcp_store_ts_recent(struct tcp_sock *tp)
 {
 	/* In extended mode, the ts_recent value is changed to the forward OWD
 	 * also updates
 	 */
-	/* if (tp->rx_opt.tstamp_extended) {*/
+	if (tp->rx_opt.tstamp_extended) {
 		/* printk ("Storing recent value");
 		 * computes OWD, updates the value too
 		 */
-	/* 	tp->rx_opt.ts_recent = tcp_time_stamp - tp->rx_opt.rcv_tsval;*/
-	/* 	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);*/
+		tp->rx_opt.ts_recent = tcp_time_stamp_extended - tp->rx_opt.rcv_tsval;
+	/* 	 TODO should we do it here or later ?
+	 *  	 tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);*/
 		/* check it 's not 0 */
 	/* 	tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr);*/
 
-	/* } else {*/
+	} else {
 		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
-	/* } */
+	}
 	tp->rx_opt.ts_recent_stamp = get_seconds();
 }
 
