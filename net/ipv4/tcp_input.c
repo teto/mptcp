@@ -3602,6 +3602,7 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 		 * computes OWD, updates the value too
 		 */
 		tp->rx_opt.ts_recent = tcp_time_stamp_extended - tp->rx_opt.rcv_tsval;
+		mptcp_debug("%s: storing ts_recent:", tp->rx_opt.ts_recent);
 	/* 	 TODO should we do it here or later ?
 	 *  	 tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);*/
 		/* check it 's not 0 */
@@ -3625,6 +3626,9 @@ static void tcp_replace_ts_recent(struct tcp_sock *tp, u32 seq)
 
 		if (tcp_paws_check(&tp->rx_opt, 0))
 			tcp_store_ts_recent(tp);
+		/* else { */
+		/* 	pr_warn("doesnt pass paws check"); */
+		/* } */
 	}
 }
 

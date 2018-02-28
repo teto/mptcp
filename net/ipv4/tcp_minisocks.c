@@ -781,7 +781,6 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 
 		/* a few lines before we have tmp_opt.ts_recent = req->ts_recent; */
 		/* TODO change */
-		/* req->ts_recent = 42; */
 		if (sysctl_tcp_timestamps > 2) {
 			mptcp_debug("%s: Connection request: setting tsecr to %u", __func__, tmp_opt.rcv_tsecr);
 			req->ts_recent = tcp_time_stamp_extended - tmp_opt.rcv_tsval;

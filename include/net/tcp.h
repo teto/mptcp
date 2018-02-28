@@ -1516,6 +1516,10 @@ static inline int tcp_fin_time(const struct sock *sk)
 static inline bool tcp_paws_check(const struct tcp_options_received *rx_opt,
 				  int paws_win)
 {
+	if (rx_opt->tstamp_extended) {
+		/* as a temporary measure */
+		return true;
+	}
 	if ((s32)(rx_opt->ts_recent - rx_opt->rcv_tsval) <= paws_win)
 		return true;
 	if (unlikely(get_seconds() >= rx_opt->ts_recent_stamp + TCP_PAWS_24DAYS))
@@ -1527,6 +1531,8 @@ static inline bool tcp_paws_check(const struct tcp_options_received *rx_opt,
 	 */
 	if (!rx_opt->ts_recent)
 		return true;
+
+	pr_warn("PAWS failure !! ");
 	return false;
 }
 
