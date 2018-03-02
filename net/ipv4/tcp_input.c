@@ -6111,7 +6111,9 @@ discard:
 	/* PAWS check. */
 	if (tp->rx_opt.ts_recent_stamp && tp->rx_opt.saw_tstamp &&
 	    tcp_paws_reject(&tp->rx_opt, 0))
+	{
 		goto discard_and_undo;
+	}
 
 	/* TODO - check this here for MPTCP */
 	if (th->syn) {
