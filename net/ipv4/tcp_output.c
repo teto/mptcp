@@ -117,7 +117,7 @@ static inline u32 tcp_ts_interval (void)
 	/* long ns_prec = 1/CLOCKS_PER_SEC * 1000000000; */
 	u32 ns_prec = ktime_get_resolution_ns();
 
-	pr_debug("clock precision of %u", ns_prec);
+	pr_info("clock precision of %uns", ns_prec);
 	/* return max_t(u32, ns_prec, 1); */
 	return 1;
 }
@@ -125,7 +125,10 @@ static inline u32 tcp_ts_interval (void)
 
 static inline __u32 tcp_timestamp_extended_option(void)
 {
-	return TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x1fff & tcp_ts_interval());
+	/* version on 2 bits 
+	 * value wallclock => 1
+	 */
+	return TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x0fff & tcp_ts_interval());
 }
 
 /* Calculate mss to advertise in SYN segment.

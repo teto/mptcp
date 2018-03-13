@@ -3602,7 +3602,8 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 		 * computes OWD, updates the value too
 		 */
 		tp->rx_opt.ts_recent = tcp_time_stamp_extended - tp->rx_opt.rcv_tsval;
-		mptcp_debug("%s: storing ts_recent:", tp->rx_opt.ts_recent);
+		/* too verbose */
+		/* mptcp_debug("%s: storing ts_recent: %u", __func__, tp->rx_opt.ts_recent); */
 	/* 	 TODO should we do it here or later ?
 	 *  	 tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);*/
 		/* check it 's not 0 */
@@ -5917,7 +5918,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			} else {
 				/* TODO remove we hijacked rcp_stamp to save our syn tsval */
 				tp->rx_opt.rcv_tsecr ^= tp->retrans_stamp;
-				tp->rx_opt.tstamp_extended = ((0x6f000000 & tp->rx_opt.rcv_tsecr) >> 29 )+ 1;
+				tp->rx_opt.tstamp_extended = ((0x60000000 & tp->rx_opt.rcv_tsecr) >> 29 )+ 1;
 
 				/* Save the precision  ? */
 				mptcp_debug ("%s: peer supports extended ts version=%u with precision (ns) %u. tp->rx_opt.rcv_tsecr=%u",
