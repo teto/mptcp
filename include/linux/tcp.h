@@ -138,7 +138,8 @@ struct tcp_out_options {
 #define TCP_FACK_ENABLED  (1 << 1)   /*1 = FACK is enabled locally*/
 #define TCP_DSACK_SEEN    (1 << 2)   /*1 = DSACK was received from peer*/
 
-#define TCP_TS_EXO_MASK    (1 << 31) /* most significant bit of the tcp timestamp */
+#define TCP_TSEXT_EXO_MASK     (1 << 31) /* most significant bit of the tcp timestamp */
+#define TCP_TSEXT_VERSION_MASK (0x60000000) /* bits that match version field */
 
 struct tcp_options_received {
 /*	PAWS/RTTM data	*/
@@ -254,6 +255,7 @@ struct tcp_sock {
 	u32	tsoffset;	/* timestamp offset (influenced by TCP_TIMESTAMP and sysctl 
 					   * value starting from kernel 4.10 */
 
+	u32 tsext_precision; /* ts extended precision */
 	struct list_head tsq_node; /* anchor in tsq_tasklet.head list */
 	unsigned long	tsq_flags;
 

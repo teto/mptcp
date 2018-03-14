@@ -5918,11 +5918,18 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			} else {
 				/* TODO remove we hijacked rcp_stamp to save our syn tsval */
 				tp->rx_opt.rcv_tsecr ^= tp->retrans_stamp;
-				tp->rx_opt.tstamp_extended = ((0x60000000 & tp->rx_opt.rcv_tsecr) >> 29 )+ 1;
+				tp->rx_opt.tstamp_extended = ((TCP_TSEXT_VERSION_MASK & tp->rx_opt.rcv_tsecr) >> 29 ) + 1;
 
+				/* take max with our own precision */
+				tp->tsext_precision = tp->rx_opt.rcv_tsecr & 0x00ffffff;
 				/* Save the precision  ? */
-				mptcp_debug ("%s: peer supports extended ts version=%u with precision (ns) %u. tp->rx_opt.rcv_tsecr=%u",
-					__func__, tp->rx_opt.tstamp_extended, (tp->rx_opt.rcv_tsecr), tp->rx_opt.rcv_tsecr);
+				mptcp_debug ("%s: peer supports extended ts version=%u with precision (ns) %u. (initial syn.tsval=tp->retrans_stamp=%u tp->rx_opt.rcv_tsecr=%u",
+					__func__,
+					tp->rx_opt.tstamp_extended,
+					tp->tsext_precision,
+					tp->retrans_stamp,
+					tp->rx_opt.rcv_tsecr
+				);
 
 				/* restore the expected value by PAWS a few lines below */
 				tp->rx_opt.rcv_tsecr = tp->retrans_stamp;
@@ -6561,7 +6568,7 @@ static void tcp_openreq_init(struct request_sock *req,
 	/* 1/ check timestamps are enabled
 	 * 2/ retrieve the version number
 	 */
-    ireq->tstamp_extended = (rx_opt->tstamp_ok && (rx_opt->rcv_tsecr & TCP_TS_EXO_MASK))
+    ireq->tstamp_extended = (rx_opt->tstamp_ok && (rx_opt->rcv_tsecr & TCP_TSEXT_EXO_MASK))
 		/* + 1 so that it's not 0 even when version is 0 */
 		? ((rx_opt->rcv_tsecr & 0x6f000000) >> 29) + 1 : 0;
     mptcp_debug ("ts_extended version=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u",

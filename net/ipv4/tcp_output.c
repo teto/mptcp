@@ -117,7 +117,8 @@ static inline u32 tcp_ts_interval (void)
 	/* long ns_prec = 1/CLOCKS_PER_SEC * 1000000000; */
 	u32 ns_prec = ktime_get_resolution_ns();
 
-	pr_info("clock precision of %uns", ns_prec);
+	/* can be 0 careful */
+	/* pr_info("clock precision of %uns", ns_prec); */
 	/* return max_t(u32, ns_prec, 1); */
 	return 1;
 }
@@ -128,7 +129,7 @@ static inline __u32 tcp_timestamp_extended_option(void)
 	/* version on 2 bits 
 	 * value wallclock => 1
 	 */
-	return TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x0fff & tcp_ts_interval());
+	return TCP_TSEXT_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x0fff & tcp_ts_interval());
 }
 
 /* Calculate mss to advertise in SYN segment.
@@ -694,8 +695,12 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
 			/* return sender tsval XOR our config. */
 			opts->tsecr = req->ts_recent ^ tcp_timestamp_extended_option();
-			mptcp_debug ("%s: extended ts, reusing syn tsval=%u, sending tsecr=%u",
-					__func__, req->ts_recent, opts->tsecr);
+			mptcp_debug ("%s: extended ts, reusing syn tsval=%u, sending tsecr=%u (xoring option with syn.tsval %u)",
+					__func__, 
+					req->ts_recent,
+					opts->tsecr,
+					req->ts_recent
+					);
 		} else {
 			pr_warn ("no ts_extended in synack: ireq->tstamp_extended=%u", ireq->tstamp_extended);
 		}
