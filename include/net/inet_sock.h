@@ -99,6 +99,7 @@ struct inet_request_sock {
 				saw_mpc    : 1;
 	kmemcheck_bitfield_end(flags);
 	u32                     ir_mark;
+	u32                     tsext_precision; /* client precision */
 	union {
 		struct ip_options_rcu __rcu	*ireq_opt;
 #if IS_ENABLED(CONFIG_IPV6)

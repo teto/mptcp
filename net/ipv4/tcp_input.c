@@ -3601,9 +3601,18 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 		/* printk ("Storing recent value");
 		 * computes OWD, updates the value too
 		 */
-		tp->rx_opt.ts_recent = tcp_time_stamp_extended - tp->rx_opt.rcv_tsval;
+		u32 now= tcp_time_stamp_extended;
+		if (now <=  tp->rx_opt.rcv_tsval) {
+			pr_warn("%s: ignore measurement, one of the ts counter has wrapped now=%u received tsval=%u (would result in %u)", 
+					__func__, now, tp->rx_opt.rcv_tsval,
+					now - tp->rx_opt.rcv_tsval
+			);
+			return;
+		}
+		tp->rx_opt.ts_recent = now - tp->rx_opt.rcv_tsval;
 		/* too verbose */
-		/* mptcp_debug("%s: storing ts_recent: %u", __func__, tp->rx_opt.ts_recent); */
+		mptcp_debug("%s: storing ts_recent: %u = current time (%u) - tsval (%u)", 
+				__func__, tp->rx_opt.ts_recent, now, tp->rx_opt.rcv_tsval);
 	/* 	 TODO should we do it here or later ?
 	 *  	 tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);*/
 		/* check it 's not 0 */
@@ -6046,7 +6055,8 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			tp->tcp_header_len =
 				sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
 			tp->advmss	    -= TCPOLEN_TSTAMP_ALIGNED;
-			mptcp_debug("%s: this part was left untouched", __func__);
+			mptcp_debug("%s: this part was left untouched, tststamp_extended=%u", 
+					__func__, tp->rx_opt.tstamp_extended);
 			tcp_store_ts_recent(tp);
 		} else {
 			tp->tcp_header_len = sizeof(struct tcphdr);
@@ -6571,8 +6581,9 @@ static void tcp_openreq_init(struct request_sock *req,
     ireq->tstamp_extended = (rx_opt->tstamp_ok && (rx_opt->rcv_tsecr & TCP_TSEXT_EXO_MASK))
 		/* + 1 so that it's not 0 even when version is 0 */
 		? ((rx_opt->rcv_tsecr & 0x6f000000) >> 29) + 1 : 0;
-    mptcp_debug ("ts_extended version=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u",
-			ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent);
+	ireq->tsext_precision = 0x00ffffff & rx_opt->rcv_tsecr;
+    mptcp_debug ("ts_extended version=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u client precision=%uns",
+			ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent, ireq->tsext_precision);
 }
 
 struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,

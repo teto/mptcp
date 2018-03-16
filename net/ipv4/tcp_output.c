@@ -610,6 +610,7 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 			WARN(opts->tsecr != 0, "tsecr should not be null");
 			// write an inline function
 			/* opts->tsecr = TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x1fff & tcp_ts_interval()); */
+			opts->tsval = tcp_time_stamp_extended;
 			opts->tsecr = tcp_timestamp_extended_option();
 				/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
 			 * look at retrans_stamp instead */
@@ -694,6 +695,7 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 
 		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
 			/* return sender tsval XOR our config. */
+			opts->tsval = tcp_time_stamp_extended;
 			opts->tsecr = req->ts_recent ^ tcp_timestamp_extended_option();
 			mptcp_debug ("%s: extended ts, reusing syn tsval=%u, sending tsecr=%u (xoring option with syn.tsval %u)",
 					__func__, 
@@ -761,12 +763,18 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 
 		if (unlikely(tp->rx_opt.tstamp_extended)) {
 			/* getnstimeofday64 */
+
+			/* mptcp_debug("%s: a priori sending", __func__); */
 			opts->tsval = tcp_time_stamp_extended + tp->tsoffset;
 		}
 
 		/* In extended mode, the ts_recent value was already changed to the
 		 * forward OWD in tcp_store_ts_recent */
 		opts->tsecr = tp->rx_opt.ts_recent;
+		mptcp_debug("%s: extended=%d a priori sending %u",
+				__func__, tp->rx_opt.tstamp_extended,
+				opts->tsecr
+			);
 
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}

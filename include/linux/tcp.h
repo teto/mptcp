@@ -157,6 +157,8 @@ struct tcp_options_received {
 		sack_ok : 4,	/* SACK seen on SYN packet		*/
 		snd_wscale : 4,	/* Window scaling received from sender	*/
 		rcv_wscale : 4;	/* Window scaling to send to receiver	*/
+	/* u16 tsext_precision: */ 
+	/* tsext_mask */
 	u8	num_sacks;	/* Number of SACK blocks		*/
 	u16	user_mss;	/* mss requested by user in ioctl	*/
 	u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
@@ -255,7 +257,7 @@ struct tcp_sock {
 	u32	tsoffset;	/* timestamp offset (influenced by TCP_TIMESTAMP and sysctl 
 					   * value starting from kernel 4.10 */
 
-	u32 tsext_precision; /* ts extended precision */
+	u32 tsext_precision; /* ts extended precision TODO move to tcp_options_received ? */
 	struct list_head tsq_node; /* anchor in tsq_tasklet.head list */
 	unsigned long	tsq_flags;
 

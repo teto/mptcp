@@ -860,7 +860,9 @@ static inline u32 tcp_time_stamp_extended_func (void) {
 	/* getnstimeofday64(&ts); */
 	/* 	return ts.tv_nsec; */
 /* http://www.fieldses.org/~bfields/kernel/time.txt */
-	return current_kernel_time().tv_nsec;
+
+	/* in microseconds */
+	return current_kernel_time().tv_nsec >> 3;
 	/* ktime_get_ts64 */
 }
 
@@ -1519,7 +1521,9 @@ static inline bool tcp_paws_check(const struct tcp_options_received *rx_opt,
 				  int paws_win)
 {
 	if (rx_opt->tstamp_extended) {
-		/* as a temporary measure */
+		/* as a temporary measure 
+		 * todo should compare value with RTT and measured owd, to detect changes
+		 * */
 		return true;
 	}
 	if ((s32)(rx_opt->ts_recent - rx_opt->rcv_tsval) <= paws_win)

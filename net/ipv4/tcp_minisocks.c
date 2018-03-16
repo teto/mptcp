@@ -571,6 +571,7 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 			/* mptcp_debug("setting ts_recent_stamp to "); */
 			newtp->rx_opt.ts_recent = req->ts_recent;
 			newtp->rx_opt.ts_recent_stamp = get_seconds();
+			newtp->tsext_precision = ireq->tsext_precision;
 			newtp->tcp_header_len = sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
 		} else {
 			newtp->rx_opt.ts_recent_stamp = 0;
