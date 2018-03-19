@@ -129,7 +129,7 @@ static inline __u32 tcp_timestamp_extended_option(void)
 	/* version on 2 bits 
 	 * value wallclock => 1
 	 */
-	return TCP_TSEXT_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x0fff & tcp_ts_interval());
+	return TCP_TSEXT_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x00ffffff & tcp_ts_interval());
 }
 
 /* Calculate mss to advertise in SYN segment.
@@ -612,6 +612,7 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 			/* opts->tsecr = TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x1fff & tcp_ts_interval()); */
 			opts->tsval = tcp_time_stamp_extended;
 			opts->tsecr = tcp_timestamp_extended_option();
+			tp->retrans_stamp = opts->tsval;
 				/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
 			 * look at retrans_stamp instead */
 

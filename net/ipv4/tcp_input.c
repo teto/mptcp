@@ -5927,6 +5927,13 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			} else {
 				/* TODO remove we hijacked rcp_stamp to save our syn tsval */
 				tp->rx_opt.rcv_tsecr ^= tp->retrans_stamp;
+				mptcp_debug ("%s: tsecr=%u after xoring with recent_tstamp %u", __func__, 
+						tp->rx_opt.rcv_tsecr,
+						tp->retrans_stamp
+						
+				);
+				// la valeur binaire la elle est parfaite
+				mptcp_debug ("%s: version bits: %u", __func__, (TCP_TSEXT_VERSION_MASK & tp->rx_opt.rcv_tsecr) >> 29);
 				tp->rx_opt.tstamp_extended = ((TCP_TSEXT_VERSION_MASK & tp->rx_opt.rcv_tsecr) >> 29 ) + 1;
 
 				/* take max with our own precision */
