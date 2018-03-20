@@ -856,14 +856,20 @@ ktime_get_resolution_ns ( 	WARN_ON(timekeeping_suspended); )
 #define tcp_time_stamp_extended		((__u32)(tcp_time_stamp_extended_func()))
 
 static inline u32 tcp_time_stamp_extended_func (void) {
-	/* struct timespec64 ts; */
+	struct timespec64 ts;
 	/* getnstimeofday64(&ts); */
 	/* 	return ts.tv_nsec; */
 /* http://www.fieldses.org/~bfields/kernel/time.txt */
 
 	/* in microseconds */
-	return current_kernel_time().tv_nsec >> 3;
+ 
+	 /* long long int nsTime = ktime_to_ns(ktime_get()); */
+	 /* The ktime_get() function returns ktime_t */
+		 /* do_gettimeofday() */
+	ktime_get_real_ts64(&ts);
+	/* return current_kernel_time().tv_nsec; */
 	/* ktime_get_ts64 */
+	return ts.tv_nsec;
 }
 
 static inline u32 tcp_skb_timestamp(const struct sk_buff *skb)
