@@ -221,10 +221,11 @@ struct mptcp_pm_ops {
 	void (*new_session)(const struct sock *meta_sk);
 	void (*release_sock)(struct sock *meta_sk);
 	void (*fully_established)(struct sock *meta_sk);
+	void (*close_session)(struct sock *meta_sk);
 	void (*new_remote_address)(struct sock *meta_sk);
 	void (*subflow_error)(struct sock *meta_sk, struct sock *sk);
-	int  (*get_local_id)(sa_family_t family, union inet_addr *addr,
-			     struct net *net, bool *low_prio);
+	int  (*get_local_id)(const struct sock *meta_sk, sa_family_t family,
+			     union inet_addr *addr, bool *low_prio);
 	void (*addr_signal)(struct sock *sk, unsigned *size,
 			    struct tcp_out_options *opts, struct sk_buff *skb);
 	void (*add_raddr)(struct mptcp_cb *mpcb, const union inet_addr *addr,
@@ -232,7 +233,10 @@ struct mptcp_pm_ops {
 	void (*rem_raddr)(struct mptcp_cb *mpcb, u8 rem_id);
 	void (*init_subsocket_v4)(struct sock *sk, struct in_addr addr);
 	void (*init_subsocket_v6)(struct sock *sk, struct in6_addr addr);
+	void (*new_subflow)(struct sock *sk);
+	void (*established_subflow)(struct sock *sk);
 	void (*delete_subflow)(struct sock *sk);
+	void (*prio_changed)(struct sock *sk, int low_prio);
 
 	char		name[MPTCP_PM_NAME_MAX];
 	struct module	*owner;
