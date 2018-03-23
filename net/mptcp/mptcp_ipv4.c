@@ -269,8 +269,9 @@ reset_and_discard:
  *
  * We are in user-context and meta-sock-lock is hold.
  */
-int mptcp_init4_subsockets(struct sock *meta_sk, const struct mptcp_loc4 *loc,
-			   struct mptcp_rem4 *rem)
+int __mptcp_init4_subsockets(struct sock *meta_sk, const struct mptcp_loc4 *loc,
+			     __be16 sport, struct mptcp_rem4 *rem,
+			     struct sock **subsk)
 {
 	struct tcp_sock *tp;
 	struct sock *sk;
@@ -313,7 +314,7 @@ int mptcp_init4_subsockets(struct sock *meta_sk, const struct mptcp_loc4 *loc,
 	/** Then, connect the socket to the peer */
 	loc_in.sin_family = AF_INET;
 	rem_in.sin_family = AF_INET;
-	loc_in.sin_port = 0;
+	loc_in.sin_port = sport;
 	if (rem->port)
 		rem_in.sin_port = rem->port;
 	else
@@ -355,6 +356,9 @@ int mptcp_init4_subsockets(struct sock *meta_sk, const struct mptcp_loc4 *loc,
 	sk_set_socket(sk, meta_sk->sk_socket);
 	sk->sk_wq = meta_sk->sk_wq;
 
+	if (subsk)
+		*subsk = sk;
+
 	return 0;
 
 error:
@@ -368,7 +372,7 @@ error:
 	}
 	return ret;
 }
-EXPORT_SYMBOL(mptcp_init4_subsockets);
+EXPORT_SYMBOL(__mptcp_init4_subsockets);
 
 const struct inet_connection_sock_af_ops mptcp_v4_specific = {
 	.queue_xmit	   = ip_queue_xmit,
