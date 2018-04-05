@@ -562,8 +562,18 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		ptr += (len + 3) >> 2;
 	}
 
-	if (unlikely(OPTION_MPTCP & opts->options))
+	if (unlikely(OPTION_MPTCP & opts->options)) {
 		mptcp_options_write(ptr, tp, opts, skb);
+	} 
+	/* else if(mptcp(tp)) {*/
+	/* 	/* TODO if this is the fastest bacward path send data ack*/ 
+	/* 	 * 1/ check if it's mptcp compatible*/
+	/* 	 * 2/ check*/ 
+	/* 	 */*/
+	/* 		? tcp_sk(mptcp_meta_sk(sk)) : tp*/
+
+	/* }*/
+
 }
 
 

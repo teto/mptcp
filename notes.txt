@@ -44,3 +44,37 @@ tcp_synack_rtt_meas
 tcp_synack_rtt_meas
 Listening procedure:
 tcp_rcv_state_process( "if (sk->sk_state == TCP_NEW_SYN_RECV)" ) -> tcp_conn_request -> tcp_openreq_init
+
+
+
+ACK path for mptcp
+mptcp_sub_retransmit_timer
+mptcp_ack_timer/mptcp_ack_retransmit_timer concern
+mptcp_established_options -> mptcp_write_dss_data_ack (used in
+		mptcp_save_dss_data_seq and mptcp_options_write)
+
+
+tcp_options_write calls -> mptcp_options_write
+
+Reinjections related:
+- mptcp_is_reinjected
+
+
+maybe I should use tcp_send_ack, it is used in a variety of places
+mptcp_queue_skbgit diff-tree --check EMPTY HEAD
+- __tcp_ack_snd_check
+- mptcp_cleanup_rbuf
+
+
+===========
+mptcp_queue_skbg is where changes should happen.
+
+Interestingly we have:
+/* Quick ACK if more 3/4 of the receive window is filled */
+if (after64(tp->mptcp->map_data_seq,
+		rcv_nxt64 + 3 * (tcp_receive_window(meta_tp) >> 2)))
+	tcp_enter_quickack_mode(sk);
+
+time related mptcp_set_rto
+
+TCP_MAX_QUICKACKS
