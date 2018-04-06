@@ -922,6 +922,52 @@ void mptcp_synack_options(struct request_sock *req,
 	}
 }
 
+
+/* The goal is to always ack on fastest path 
+ * mptcp_established_options 
+ * 1/ find fastest path
+ * 2/ call tcp_send_ack on it
+ * 3/ looking at mptcp_established_options, it always sends data acks so
+ *
+ * TODO get function find_fastest_subflow ?
+ */
+void mptcp_send_ack_on_fast_path(struct sock *sk) 
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct mptcp_cb *mpcb = tp->mpcb;
+
+	struct sock *sk_it, *sk_tmp;
+	struct tcp_sock *tp_fastest = tp;
+
+
+	/* look for the fastest backward path 
+	 * why do we have struct inet_connection_sock { 
+	 */
+	mptcp_for_each_sk_safe(mpcb, sk_it, sk_tmp) {
+
+		struct tcp_sock *tp_it = tcp_sk(sk_it);
+		if (tp_it->owd_out.delay_us > tp_fastest->owd_out.delay_us) {
+
+			tp_fastest = tp_it;
+			pr_info ( "sowd of %u beats %u ",  tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
+		}
+	}
+
+	pr_info ( "best sock " );
+
+	/* should we check against the current sk */
+	if (tp_fastest == tp) {
+		/* do nothing */
+
+		pr_info ( "best sock is initial sock, no need to do anything ?" );
+		return;
+	} 
+
+	/* mptcp option should be automatically inserted */
+	tcp_send_ack( (struct sock*)tp_fastest);
+}
+
+
 void mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 			       struct tcp_out_options *opts, unsigned *size)
 {
@@ -999,6 +1045,7 @@ void mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	}
 
 	if (!tp->mptcp->include_mpc && !tp->mptcp->pre_established) {
+		/* always send a dataack */
 		opts->options |= OPTION_MPTCP;
 		opts->mptcp_options |= OPTION_DATA_ACK;
 		/* If !skb, we come from tcp_current_mss and thus we always

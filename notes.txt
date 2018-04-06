@@ -68,6 +68,7 @@ mptcp_queue_skbgit diff-tree --check EMPTY HEAD
 
 ===========
 mptcp_queue_skbg is where changes should happen.
+Add mptcp_send_ack_on_fast_path
 
 Interestingly we have:
 /* Quick ACK if more 3/4 of the receive window is filled */

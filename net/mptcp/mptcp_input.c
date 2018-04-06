@@ -44,6 +44,9 @@ static inline bool before64(const u64 seq1, const u64 seq2)
 /* is seq1 > seq2 ? */
 #define after64(seq1, seq2)	before64(seq2, seq1)
 
+/* forward declaration */
+void mptcp_send_ack_on_fast_path(struct sock *sk);
+
 static inline void mptcp_become_fully_estab(struct sock *sk)
 {
 	tcp_sk(sk)->mptcp->fully_established = 1;
@@ -1038,6 +1041,9 @@ static int mptcp_queue_skb(struct sock *sk)
 				kfree_skb_partial(tmp1, fragstolen);
 
 			data_queued = true;
+
+			/* Experimental addition */
+			mptcp_send_ack_on_fast_path(sk);
 next:
 			if (!skb_queue_empty(&sk->sk_receive_queue) &&
 			    !before(TCP_SKB_CB(tmp)->seq,

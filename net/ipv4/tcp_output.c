@@ -115,7 +115,7 @@ static inline u32 tcp_ts_interval (void)
 	* extended timestamps will get disabled
 	*/
 	/* long ns_prec = 1/CLOCKS_PER_SEC * 1000000000; */
-	u32 ns_prec = ktime_get_resolution_ns();
+	/* u32 ns_prec = ktime_get_resolution_ns(); */
 
 	/* can be 0 careful */
 	/* pr_info("clock precision of %uns", ns_prec); */
@@ -565,15 +565,7 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 	if (unlikely(OPTION_MPTCP & opts->options)) {
 		mptcp_options_write(ptr, tp, opts, skb);
 	} 
-	/* else if(mptcp(tp)) {*/
-	/* 	/* TODO if this is the fastest bacward path send data ack*/ 
-	/* 	 * 1/ check if it's mptcp compatible*/
-	/* 	 * 2/ check*/ 
-	/* 	 */*/
-	/* 		? tcp_sk(mptcp_meta_sk(sk)) : tp*/
-
-	/* }*/
-
+	/* it might be best to let dack be generated from mptcp_queue_skb */
 }
 
 
