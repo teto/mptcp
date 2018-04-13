@@ -79,3 +79,20 @@ if (after64(tp->mptcp->map_data_seq,
 time related mptcp_set_rto
 
 TCP_MAX_QUICKACKS
+
+
+Les timers sont definies comme 
+#define TCP_RTO_MAX	((unsigned)(120*HZ))
+tcp_set_rto
+
+
+static inline u32 __tcp_set_rto(const struct tcp_sock *tp)
+{
+	return usecs_to_jiffies((tp->srtt_us >> 3) + tp->rttvar_us);
+}
+
+This sentence is weird
+	 * 1. If rtt variance happened to be less 50msec, it is hallucination.
+
+	 Pour TLP tail loss probe regarder 
+	 tcp_schedule_loss_probe
