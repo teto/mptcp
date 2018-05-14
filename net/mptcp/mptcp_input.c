@@ -1462,9 +1462,6 @@ static void mptcp_data_ack(struct sock *sk, const struct sk_buff *skb)
 	if (tp->mptcp->pre_established && !tcp_hdr(skb)->syn) {
 		tp->mptcp->pre_established = 0;
 		sk_stop_timer(sk, &tp->mptcp->mptcp_ack_timer);
-
-		if (meta_tp->mpcb->pm_ops->established_subflow)
-			meta_tp->mpcb->pm_ops->established_subflow(sk);
 	}
 
 	/* If we are in infinite mapping mode, rx_opt.data_ack has been
@@ -2145,7 +2142,6 @@ bool mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct mptcp_options_received *mopt = &tp->mptcp->rx_opt;
-	struct mptcp_cb *mpcb = tp->mpcb;
 
 	if (tp->mpcb->infinite_mapping_rcv || tp->mpcb->infinite_mapping_snd)
 		return false;
@@ -2195,18 +2191,12 @@ bool mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 	if (mopt->saw_low_prio) {
 		if (mopt->saw_low_prio == 1) {
 			tp->mptcp->rcv_low_prio = mopt->low_prio;
-			if (mpcb->pm_ops->prio_changed)
-				mpcb->pm_ops->prio_changed(sk, mopt->low_prio);
 		} else {
 			struct sock *sk_it;
 			mptcp_for_each_sk(tp->mpcb, sk_it) {
 				struct mptcp_tcp_sock *mptcp = tcp_sk(sk_it)->mptcp;
-				if (mptcp->rem_id == mopt->prio_addr_id) {
+				if (mptcp->rem_id == mopt->prio_addr_id)
 					mptcp->rcv_low_prio = mopt->low_prio;
-					if (mpcb->pm_ops->prio_changed)
-						mpcb->pm_ops->prio_changed(sk,
-									   mopt->low_prio);
-				}
 			}
 		}
 		mopt->saw_low_prio = 0;

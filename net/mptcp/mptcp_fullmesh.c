@@ -1587,12 +1587,11 @@ removal:
 	rcu_read_unlock_bh();
 }
 
-static int full_mesh_get_local_id(const struct sock *meta_sk,
-				  sa_family_t family, union inet_addr *addr,
-				  bool *low_prio)
+static int full_mesh_get_local_id(sa_family_t family, union inet_addr *addr,
+				  struct net *net, bool *low_prio)
 {
 	struct mptcp_loc_addr *mptcp_local;
-	const struct mptcp_fm_ns *fm_ns = fm_get_ns(sock_net(meta_sk));
+	const struct mptcp_fm_ns *fm_ns = fm_get_ns(net);
 	int index, id = -1;
 
 	/* Handle the backup-flows */

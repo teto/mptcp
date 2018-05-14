@@ -661,9 +661,6 @@ void mptcp_sock_destruct(struct sock *sk)
 		struct mptcp_cb *mpcb = tp->mpcb;
 		struct mptcp_tw *mptw;
 
-		if (mpcb->pm_ops->close_session)
-			mpcb->pm_ops->close_session(mptcp_meta_sk(sk));
-
 		/* The mpcb is disappearing - we can make the final
 		 * update to the rcv_nxt of the time-wait-sock and remove
 		 * its reference to the mpcb.
@@ -1340,10 +1337,6 @@ int mptcp_add_sock(struct sock *meta_sk, struct sock *sk, u8 loc_id, u8 rem_id,
 			    ntohs(((struct inet_sock *)tp)->inet_dport),
 			    mpcb->cnt_subflows);
 #endif
-
-	/* Ignore master_sk as it is already announced via new_session */
-	if (mpcb->pm_ops->new_subflow && sk != mpcb->master_sk)
-		mpcb->pm_ops->new_subflow(sk);
 
 	return 0;
 }
@@ -2129,9 +2122,6 @@ struct sock *mptcp_check_req_child(struct sock *meta_sk,
 
 	sock_rps_save_rxhash(child, skb);
 	tcp_synack_rtt_meas(child, req);
-
-	if (mpcb->pm_ops->established_subflow)
-		mpcb->pm_ops->established_subflow(child);
 
 	/* Subflows do not use the accept queue, as they
 	 * are attached immediately to the mpcb.
