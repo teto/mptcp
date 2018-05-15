@@ -157,6 +157,10 @@ enum {
 
 	MPTCP_EVENT_SUB_ERROR,
 
+	/* monitoring additions */
+    MPTCP_CMD_MONITOR,
+    MPTCP_EVENT_MONITOR,
+
 	__MPTCP_CMD_AFTER_LAST
 };
 
