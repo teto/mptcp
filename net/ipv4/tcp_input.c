@@ -3613,10 +3613,10 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 		/* too verbose */
 		mptcp_debug("%s: storing ts_recent: %u = current time (%u) - tsval (%u)", 
 				__func__, tp->rx_opt.ts_recent, now, tp->rx_opt.rcv_tsval);
-	/* 	 TODO should we do it here or later ?
-	 *  	 tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);*/
+		/* 	 TODO should we do it here or later ?*/
+	  	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);
 		/* check it 's not 0 */
-	/* 	tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr);*/
+		tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr);
 
 	} else {
 		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
