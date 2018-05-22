@@ -774,7 +774,7 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		/* In extended mode, the ts_recent value was already changed to the
 		 * forward OWD in tcp_store_ts_recent */
 		opts->tsecr = tp->rx_opt.ts_recent;
-		mptcp_debug("%s: extended=%d a priori sending %u",
+		mptcp_debug("%s: extended=%d a priori sending tsecr=%u",
 				__func__, tp->rx_opt.tstamp_extended,
 				opts->tsecr
 			);

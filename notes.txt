@@ -15,16 +15,6 @@ struct tcp_options_received {
 	u32	ts_recent;	/* Time stamp to echo next		*/
 
 In timekeeping.c c la d ou je peux recuperer le temps rapidement
-ktime_get_real_seconds 
-getnstimeofday64
-current_kernel_time64
-current_kernel_time
-timekeeping_get_ns
-ktime_get_raw_fast_ns
-ktime_get_mono_fast_ns
-ktime_get_ts64
-ktime_get_raw
-ktime_get_resolution_ns ( 	WARN_ON(timekeeping_suspended); )
 
 
  * when syncookies are in effect and tcp timestamps are enabled we encode
@@ -39,9 +29,6 @@ TODO
 
 tcp_v4_syn_recv_sock is called once 3WHS has completed
 tcp_synack_rtt_meas
-
-tcp_synack_rtt_meas
-tcp_synack_rtt_meas
 Listening procedure:
 tcp_rcv_state_process( "if (sk->sk_state == TCP_NEW_SYN_RECV)" ) -> tcp_conn_request -> tcp_openreq_init
 
@@ -53,12 +40,33 @@ mptcp_ack_timer/mptcp_ack_retransmit_timer concern
 mptcp_established_options -> mptcp_write_dss_data_ack (used in
 		mptcp_save_dss_data_seq and mptcp_options_write)
 
-
 tcp_options_write calls -> mptcp_options_write
 
-Reinjections related:
-- mptcp_is_reinjected
+Look at where it's best to reinject is
 
+==== MY ADDITIONS ===
+mptcp_send_ack_on_fast_path
+
+==== REINJECTIONS RELATED ===
+- mptcp_is_reinjected / MPTCP_REINJECT
+- mptcp_reinject_data -> __mptcp_reinject_data
+- mptcp_retransmit_skb
+
+reinjections can occur with mptcp_meta_retransmit_timer 
+
+le choix du sous-flot ou retransmettre est fait par 
+We need more choice on where to send the packet
+
+	subsk = meta_tp->mpcb->sched_ops->get_subflow(meta_sk, skb, false);
+
+mptcp_skb_entail
+__tcp_push_pending_frames
+
+Le chemin est trouve la ?!
+mptcp_find_and_set_pathmask
+En fait il ne choisit pas reellement ou reinjecter (aka laisse le scheduler)
+In tcp_skb_cb
+		__u32 path_mask; /* paths that tried to send this skb */
 
 maybe I should use tcp_send_ack, it is used in a variety of places
 mptcp_queue_skbgit diff-tree --check EMPTY HEAD
@@ -68,7 +76,10 @@ mptcp_queue_skbgit diff-tree --check EMPTY HEAD
 
 ===========
 mptcp_queue_skbg is where changes should happen.
-Add mptcp_send_ack_on_fast_path
+
+
+
+> 
 
 Interestingly we have:
 /* Quick ACK if more 3/4 of the receive window is filled */
