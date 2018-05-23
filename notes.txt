@@ -74,6 +74,10 @@ mptcp_queue_skbgit diff-tree --check EMPTY HEAD
 - mptcp_cleanup_rbuf
 
 
+=== Schedulers ===
+- implementes dans mptcp_rr.c / mptcp_sched.c /
+mptcp mptcp_sched_default
+
 ===========
 mptcp_queue_skbg is where changes should happen.
 

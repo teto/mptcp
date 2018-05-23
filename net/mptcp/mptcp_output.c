@@ -929,7 +929,7 @@ void mptcp_synack_options(struct request_sock *req,
  * direction set to != 0 for reverse path
  */
 struct tcp_sock* mptcp_find_fastest_path(struct sock *sk
-		, int direction
+		/* , int direction */
 )
 {
 	struct mptcp_cb *mpcb = tp->mpcb;
@@ -944,6 +944,7 @@ struct tcp_sock* mptcp_find_fastest_path(struct sock *sk
 	mptcp_for_each_sk_safe(mpcb, sk_it, sk_tmp) {
 
 		struct tcp_sock *tp_it = tcp_sk(sk_it);
+		pr_info ("Comparing %ld with current fastest %ld", tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
 		if (tp_it->owd_out.delay_us > tp_fastest->owd_out.delay_us) {
 
 			tp_fastest = tp_it;
@@ -1511,6 +1512,19 @@ int mptcp_retransmit_skb(struct sock *meta_sk, struct sk_buff *skb)
 		/* MPTCP_INC_STATS(sock_net(meta_sk), MPTCP_MIB_RETRANSSEGS); */
 		if (fastest != subsk) {
 			pr_info ("Not reinjecting on fastest subflow !!!");
+			// TODO check if it is because  
+			//mptcp_is_def_unavailable
+/* struct sock *sk, */
+/* 				      const struct sk_buff *skb, */
+/* 				      bool zero_wnd_test */
+			if (mptcp_is_temp_unavailable(fastest, ) ) {
+			}
+			else if (mptcp_is_def_unavailable(fastest)) {
+
+
+			}
+			// one can look at mptcp_rr_is_available to see if 
+			// or default get_available_subflow
 		}
 	}
 
