@@ -73,6 +73,12 @@ mptcp_queue_skbgit diff-tree --check EMPTY HEAD
 - __tcp_ack_snd_check
 - mptcp_cleanup_rbuf
 
+=== TAIL LOSS PROBE ===
+- tlp.patch est un patch a l'envers (git apply -R tlp.patch) mais l'ancetre
+n'existe pas dans mon arbre
+- tcp_probe_timer
+Ajoute send_loss_probe/
+
 
 === Schedulers ===
 - implementes dans mptcp_rr.c / mptcp_sched.c /
@@ -80,8 +86,6 @@ mptcp mptcp_sched_default
 
 ===========
 mptcp_queue_skbg is where changes should happen.
-
-
 
 > 
 
