@@ -597,7 +597,7 @@ void tcp_write_timer_handler(struct sock *sk)
 		tcp_resume_early_retransmit(sk);
 		break;
 	case ICSK_TIME_LOSS_PROBE:
-		tcp_send_loss_probe(sk);
+		tcp_sk(sk)->ops->send_loss_probe(sk);
 		break;
 	case ICSK_TIME_RETRANS:
 		icsk->icsk_pending = 0;
