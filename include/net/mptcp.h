@@ -244,6 +244,11 @@ struct mptcp_sched_ops {
 	struct sock *		(*get_subflow)(struct sock *meta_sk,
 					       struct sk_buff *skb,
 					       bool zero_wnd_test);
+
+ /* Sets *@reinject to 1 if the returned segment comes from the
+ * reinject queue. Sets it to 0 if it is the regular send-head of the meta-sk,
+ * and sets it to -1 if it is a meta-level retransmission to optimize the
+ * receive-buffer. */
 	struct sk_buff *	(*next_segment)(struct sock *meta_sk,
 						int *reinject,
 						struct sock **subsk,

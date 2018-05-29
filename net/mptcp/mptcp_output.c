@@ -121,6 +121,8 @@ static void __mptcp_reinject_data(struct sk_buff *orig_skb, struct sock *meta_sk
 	const struct tcp_sock *meta_tp = tcp_sk(meta_sk);
 	struct mptcp_cb *mpcb = meta_tp->mpcb;
 	u32 seq, end_seq;
+    
+	pr_info ("__mptcp_reinject_data call");
 
 	if (clone_it) {
 		/* pskb_copy is necessary here, because the TCP/IP-headers
@@ -952,7 +954,7 @@ struct sock* mptcp_find_fastest_path(
 		}
 
 		pr_info ("Comparing %u with current fastest %u", tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
-		if (tp_it->owd_out.delay_us > tp_fastest->owd_out.delay_us) {
+		if (tp_it->owd_out.delay_us < tp_fastest->owd_out.delay_us) {
 
 			tp_fastest = tp_it;
 			pr_info ( "sowd of %u beats %u ",  tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
@@ -1716,6 +1718,7 @@ void mptcp_sub_retransmit_timer(struct sock *sk)
 	tcp_retransmit_timer(sk);
 
 	if (!tp->fastopen_rsk) {
+		pr_info ("reinjecting because of retransmit_timer");
 		mptcp_reinject_data(sk, 1);
 		mptcp_set_rto(sk);
 	}
@@ -1732,15 +1735,15 @@ void mptcp_sub_send_loss_probe(struct sock *sk)
         struct tcp_sock *tp = tcp_sk(sk);
         struct sk_buff *skb_it, *tmp;
 
-        printk("Enter MPTCP Send_loss_probe");
+        pr_info ("Enter MPTCP Send_loss_probe");
         /* START OF NEW TLP */
         if (tcp_send_head(sk)) {
-                printk("Send first available packet");
+                pr_info ("Send first available packet");
                 skb_tlp = tcp_write_queue_head(sk);
                 __mptcp_reinject_data(skb_tlp, meta_sk, sk, 1);
         } else {
 
-                printk("Send all transmitted packets");
+                pr_info ("Send all transmitted packets");
                 /*      skb_tlp = tcp_write_queue_tail(sk); */
                      /* It has already been closed - there is really no point in reinjecting */
                         if (meta_sk->sk_state == TCP_CLOSE)

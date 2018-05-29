@@ -51,8 +51,21 @@ mptcp_send_ack_on_fast_path
 - mptcp_is_reinjected / MPTCP_REINJECT
 - mptcp_reinject_data -> __mptcp_reinject_data
 - mptcp_retransmit_skb
+- seen in mptcp_push_pending_frames
+	 "But, MPTCP also checks packets_out, as this is an
+	 indication that we might want to do opportunistic reinjection."
+1/ mptcp_write_xmit demande au scheduler.next_segment() le prochain segment 
+Dans le scheduler par defaut, quand il n'y a plus d'espace dans la snd_wnd de la
+meta & different de la reinjection, mptcp_next_segment() dans mptcp_sched.c appelle
+mptcp_rcv_buf_optimization qui fait la reinjection opportuniste:
 
-reinjections can occur with mptcp_meta_retransmit_timer 
+ /* Sets *@reinject to 1 if the returned segment comes from the
+ * reinject queue. Sets it to 0 if it is the regular send-head of the meta-sk,
+ * and sets it to -1 if it is a meta-level retransmission to optimize the
+ * receive-buffer. */
+
+reinjections can occur with mptcp_meta_retransmit_timer too
+
 
 le choix du sous-flot ou retransmettre est fait par 
 We need more choice on where to send the packet

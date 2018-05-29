@@ -1381,8 +1381,10 @@ void mptcp_del_sock(struct sock *sk)
 	tp->mptcp->attached = 0;
 	mpcb->path_index_bits &= ~(1 << tp->mptcp->path_index);
 
-	if (!skb_queue_empty(&sk->sk_write_queue))
+	if (!skb_queue_empty(&sk->sk_write_queue)) {
+		pr_info ("reinjecting on sock removal");
 		mptcp_reinject_data(sk, 0);
+	}
 
 	if (is_master_tp(tp)) {
 		struct sock *meta_sk = mptcp_meta_sk(sk);

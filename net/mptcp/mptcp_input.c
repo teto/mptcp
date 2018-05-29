@@ -1608,6 +1608,8 @@ static void mptcp_send_reset_rem_id(const struct mptcp_cb *mpcb, u8 rem_id)
 
 	mptcp_for_each_sk_safe(mpcb, sk_it, tmpsk) {
 		if (tcp_sk(sk_it)->mptcp->rem_id == rem_id) {
+
+			pr_info ("reinject because of rem_id");
 			mptcp_reinject_data(sk_it, 0);
 			mptcp_send_reset(sk_it);
 		}
