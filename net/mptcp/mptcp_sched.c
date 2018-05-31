@@ -330,9 +330,18 @@ retrans:
 			}
 		}
 
-		if (do_retrans && mptcp_is_available(sk, skb_head, false))
-			return skb_head;
+		/* here I expanded the call if(mptcp_is_available(sk, skb_head, false)) { 
+		 * to be able to distinguish between the different cases !
+		 **/
+		if (do_retrans && !mptcp_is_def_unavailable(sk)) {
+
+	       if(!mptcp_is_temp_unavailable(sk, skb_head, false)) {
+				return skb_head;
+			}
+			pr_info ("missed opportunity");
+		}
 	}
+
 	return NULL;
 }
 
@@ -371,8 +380,13 @@ static struct sk_buff *__mptcp_next_segment(struct sock *meta_sk, int *reinject)
 				return NULL;
 
 			skb = mptcp_rcv_buf_optimization(subsk, 0);
-			if (skb)
+			if (skb) {
+				pr_info ("OPPO SUCCESSFUL opportunistic reinjection");
 				*reinject = -1;
+			}
+			else {
+				pr_info ("OPPO failed opportunistic reinjection");
+			}
 		}
 	}
 	return skb;
@@ -403,11 +417,17 @@ static struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
 	mss_now = tcp_current_mss(*subsk);
 
 	if (!*reinject && unlikely(!tcp_snd_wnd_test(tcp_sk(meta_sk), skb, mss_now))) {
+
+		pr_info ("with penalization");
 		skb = mptcp_rcv_buf_optimization(*subsk, 1);
-		if (skb)
+		if (skb) {
+			pr_info ("OPPO SUCCESSFUL opportunistic reinjection");
 			*reinject = -1;
-		else
+		}
+		else {
+			pr_info ("OPPO failed opportunistic reinjection");
 			return NULL;
+		}
 	}
 
 	/* No splitting required, as we will only send one single segment */
