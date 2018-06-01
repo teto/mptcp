@@ -314,8 +314,10 @@ retrans:
 	if (!(TCP_SKB_CB(skb_head)->path_mask & mptcp_pi_to_flag(tp->mptcp->path_index))) {
 		bool do_retrans = false;
 		mptcp_for_each_tp(tp->mpcb, tp_it) {
+			/* if skb was sent over this different subflow) */
 			if (tp_it != tp &&
 			    TCP_SKB_CB(skb_head)->path_mask & mptcp_pi_to_flag(tp_it->mptcp->path_index)) {
+				/* if that subflow is under memory pressure */
 				if (tp_it->snd_cwnd <= 4) {
 					do_retrans = true;
 					break;
@@ -418,14 +420,14 @@ static struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
 
 	if (!*reinject && unlikely(!tcp_snd_wnd_test(tcp_sk(meta_sk), skb, mss_now))) {
 
-		pr_info ("with penalization");
+		/* pr_info ("with penalization"); */
 		skb = mptcp_rcv_buf_optimization(*subsk, 1);
 		if (skb) {
-			pr_info ("OPPO SUCCESSFUL opportunistic reinjection");
+			pr_info ("OPPO penalty SUCCESSFUL opportunistic reinjection");
 			*reinject = -1;
 		}
 		else {
-			pr_info ("OPPO failed opportunistic reinjection");
+			pr_info ("OPPO penalty failed opportunistic reinjection");
 			return NULL;
 		}
 	}
