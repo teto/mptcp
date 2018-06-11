@@ -670,6 +670,7 @@ bool mptcp_write_xmit(struct sock *meta_sk, unsigned int mss_now, int nonagle,
 	unsigned int sublimit;
 	__u32 path_mask = 0;
 
+	/* returns segment to send along with on which subflow to send it */
 	while ((skb = mpcb->sched_ops->next_segment(meta_sk, &reinject, &subsk,
 						    &sublimit))) {
 		unsigned int limit;
@@ -767,6 +768,8 @@ bool mptcp_write_xmit(struct sock *meta_sk, unsigned int mss_now, int nonagle,
 		tcp_minshall_update(meta_tp, mss_now, skb);
 
 		if (reinject > 0) {
+			/* reinject > 0 => comes from reinject_queue 
+			 * remove it from reinject queue */
 			__skb_unlink(skb, &mpcb->reinject_queue);
 			kfree_skb(skb);
 		}
@@ -775,9 +778,11 @@ bool mptcp_write_xmit(struct sock *meta_sk, unsigned int mss_now, int nonagle,
 			break;
 	}
 
+	/* now that we have the segment we get to retransmit it */
 	mptcp_for_each_sk(mpcb, subsk) {
 		subtp = tcp_sk(subsk);
 
+		/* if segment was already sent on this subflow skip it */
 		if (!(path_mask & mptcp_pi_to_flag(subtp->mptcp->path_index)))
 			continue;
 

@@ -366,6 +366,8 @@ static struct sk_buff *__mptcp_next_segment(struct sock *meta_sk, int *reinject)
 	if (mpcb->infinite_mapping_snd || mpcb->send_infinite_mapping)
 		return tcp_send_head(meta_sk);
 
+	/* first look at if there is something to reinject 
+	 * but this can prove useless if mptcp_write_xmit was already called */
 	skb = skb_peek(&mpcb->reinject_queue);
 
 	if (skb) {
@@ -418,6 +420,8 @@ static struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
 	subtp = tcp_sk(*subsk);
 	mss_now = tcp_current_mss(*subsk);
 
+	/* here we enter the penalty mode because get_available_subflow found no match */
+	/* Does at least the first segment of SKB fit into the send window? */
 	if (!*reinject && unlikely(!tcp_snd_wnd_test(tcp_sk(meta_sk), skb, mss_now))) {
 
 		/* pr_info ("with penalization"); */

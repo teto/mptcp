@@ -49,12 +49,19 @@ mptcp_send_ack_on_fast_path
 
 ==== REINJECTIONS RELATED ===
 - mptcp_is_reinjected / MPTCP_REINJECT
-- mptcp_reinject_data -> __mptcp_reinject_data
-- mptcp_retransmit_skb
+- mptcp_reinject_data -> __mptcp_reinject_data vont reinjecter le paquet dans la
+meta->reinject_queue donc pas besoin de les tracer
+- mptcp_sub_send_loss_probe -> __mptcp_reinject_data donc pas besoin de tracer
+- mptcp_meta_retransmit_timer -> mptcp_retransmit_skb calls -> get_subflow ->
+__tcp_push_pending_frames  => on doit le tracer
 - seen in mptcp_push_pending_frames
 	 "But, MPTCP also checks packets_out, as this is an
 	 indication that we might want to do opportunistic reinjection."
-1/ mptcp_write_xmit demande au scheduler.next_segment() le prochain segment 
+
+> maybe in get_subflow we could 
+
+1/ mptcp_write_xmit demande au scheduler.next_segment() le prochain segment a
+envoyer avec la socket a utiliser.
 Dans le scheduler par defaut, quand il n'y a plus d'espace dans la snd_wnd de la
 meta & different de la reinjection, mptcp_next_segment() dans mptcp_sched.c appelle
 mptcp_rcv_buf_optimization qui fait la reinjection opportuniste:
@@ -64,19 +71,17 @@ mptcp_rcv_buf_optimization qui fait la reinjection opportuniste:
  * and sets it to -1 if it is a meta-level retransmission to optimize the
  * receive-buffer. */
 
-reinjections can occur with mptcp_meta_retransmit_timer too (mptcp_retransmit_skb seem like a better place to look at)
+an skb records on which path it is delivered via mptcp_pi_to_flag(tp->mptcp->path_index) & TCP_SKB_CB(skb)->path_mask;
+(see mptcp_dont_reinject_skb)
+	checker mptcp_skb_entail et son reinject parameter
 
+I should hook mptcp_skb_entail
 
-le choix du sous-flot ou retransmettre est fait par 
 We need more choice on where to send the packet
 
 	subsk = meta_tp->mpcb->sched_ops->get_subflow(meta_sk, skb, false);
 
-mptcp_skb_entail
-__tcp_push_pending_frames
 
-Le chemin est trouve la ?!
-mptcp_find_and_set_pathmask
 En fait il ne choisit pas reellement ou reinjecter (aka laisse le scheduler)
 In tcp_skb_cb
 		__u32 path_mask; /* paths that tried to send this skb */
@@ -89,7 +94,7 @@ mptcp_queue_skbgit diff-tree --check EMPTY HEAD
 === TAIL LOSS PROBE ===
 - tlp.patch est un patch a l'envers (git apply -R tlp.patch) mais l'ancetre
 n'existe pas dans mon arbre
-- mptcp_sub_send_loss_probe
+- 
 - tcp_probe_timer
 Ajoute send_loss_probe/
 
@@ -97,6 +102,13 @@ Ajoute send_loss_probe/
 === Schedulers ===
 - implementes dans mptcp_rr.c / mptcp_sched.c /
 mptcp mptcp_sched_default
+
+- get_subflow_from_selectors permet de choisir le meilleur sous flot
+Notamment avec ce check
+		if (tp->srtt_us < min_srtt) {
+			min_srtt = tp->srtt_us;
+			bestsk = sk;
+		}
 
 ===========
 mptcp_queue_skbg is where changes should happen.
