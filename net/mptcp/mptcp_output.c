@@ -111,6 +111,47 @@ static void mptcp_find_and_set_pathmask(const struct sock *meta_sk, struct sk_bu
 	}
 }
 
+/* now that we have OWDs, we can tell if we received a DACK 
+ * 
+ * direction set to != 0 for reverse path
+ */
+struct sock* mptcp_find_fastest_path(
+	const struct sock *meta_sk
+		/* struct sock *sk */
+)
+{
+	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
+	struct mptcp_cb *mpcb = meta_tp->mpcb;
+
+	struct sock *sk_it, *sk_tmp;
+	struct tcp_sock *tp_fastest = 0;
+
+	pr_info ("Looking for fastest path");
+
+	/* look for the fastest backward path 
+	 * why do we have struct inet_connection_sock { 
+	 */
+	mptcp_for_each_sk_safe(mpcb, sk_it, sk_tmp) {
+
+		struct tcp_sock *tp_it = tcp_sk(sk_it);
+		if (!tp_fastest) {
+			tp_fastest = tp_it;
+			continue;
+		}
+
+		pr_info ("Comparing %u with current fastest %u", tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
+		if (tp_it->owd_out.delay_us < tp_fastest->owd_out.delay_us) {
+
+			tp_fastest = tp_it;
+			pr_info ( "sowd of %u beats %u ",  tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
+		}
+	}
+
+
+	/* tcp_sk.inet_conn.icsk_inet.sk */
+	return (struct sock*)tp_fastest;
+}
+
 /* Reinject data from one TCP subflow to the meta_sk. If sk == NULL, we are
  * coming from the meta-retransmit-timer
  */
@@ -427,7 +468,7 @@ static int mptcp_write_dss_data_seq(const struct tcp_sock *tp, struct sk_buff *s
 	return mptcp_dss_len/sizeof(*ptr);
 }
 
-static bool mptcp_skb_entail(struct sock *sk, struct sk_buff *skb, int reinject)
+static int mptcp_skb_entail(struct sock *sk, struct sk_buff *skb, int reinject)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	const struct sock *meta_sk = mptcp_meta_sk(sk);
@@ -435,10 +476,10 @@ static bool mptcp_skb_entail(struct sock *sk, struct sk_buff *skb, int reinject)
 	struct tcp_skb_cb *tcb;
 	struct sk_buff *subskb = NULL;
 
-	if (!reinject)
+	if (!reinject) {
 		TCP_SKB_CB(skb)->mptcp_flags |= (mpcb->snd_hiseq_index ?
 						  MPTCPHDR_SEQ64_INDEX : 0);
-
+	} 
 	subskb = pskb_copy_for_clone(skb, GFP_ATOMIC);
 	if (!subskb)
 		return false;
@@ -514,7 +555,32 @@ static bool mptcp_skb_entail(struct sock *sk, struct sk_buff *skb, int reinject)
 		tp->mptcp->last_end_data_seq = TCP_SKB_CB(skb)->end_seq;
 	}
 
-	return true;
+	// packet was successfully sent
+	if (reinject) {
+
+		/* MATT additions 
+		* for fun we see the number of times we haven't sent on the best subflow !
+		*/
+		struct sock *fastest = mptcp_find_fastest_path(meta_sk);
+
+		/* use that instead */
+		/* MPTCP_INC_STATS(sock_net(meta_sk), MPTCP_MIB_RETRANSSEGS); */
+		if (fastest != sk 
+				/* if not sent already on the fastest subflow */
+				&& (TCP_SKB_CB(skb)->path_mask & mptcp_pi_to_flag(tcp_sk(fastest)->mptcp->path_index) == 0)
+			) {
+			pr_info ("Not reinjecting on fastest subflow !!!");
+			
+			// one can look at mptcp_rr_is_available to see if 
+			// or default get_available_subflow
+			// todo we should check it is not the wrong 
+			return 10 + reinject;
+		}
+		return 3 + reinject;
+	}
+
+
+	return 1;
 }
 
 /* Fragment an skb and update the mptcp meta-data. Due to reinject, we
@@ -931,45 +997,6 @@ void mptcp_synack_options(struct request_sock *req,
 
 
 
-/* now that we have OWDs, we can tell if we received a DACK 
- * 
- * direction set to != 0 for reverse path
- */
-struct sock* mptcp_find_fastest_path(
-	struct tcp_sock *meta_tp
-		/* struct sock *sk */
-)
-{
-	struct mptcp_cb *mpcb = meta_tp->mpcb;
-
-	struct sock *sk_it, *sk_tmp;
-	struct tcp_sock *tp_fastest = 0;
-
-	pr_info ("Looking for fastest path");
-
-	/* look for the fastest backward path 
-	 * why do we have struct inet_connection_sock { 
-	 */
-	mptcp_for_each_sk_safe(mpcb, sk_it, sk_tmp) {
-
-		struct tcp_sock *tp_it = tcp_sk(sk_it);
-		if (!tp_fastest) {
-			tp_fastest = tp_it;
-			continue;
-		}
-
-		pr_info ("Comparing %u with current fastest %u", tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
-		if (tp_it->owd_out.delay_us < tp_fastest->owd_out.delay_us) {
-
-			tp_fastest = tp_it;
-			pr_info ( "sowd of %u beats %u ",  tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
-		}
-	}
-
-
-	/* tcp_sk.inet_conn.icsk_inet.sk */
-	return (struct sock*)tp_fastest;
-}
 
 
 /* The goal is to always ack on fastest path 
@@ -987,7 +1014,7 @@ void mptcp_send_ack_on_fast_path(struct sock *sk)
 	struct sock *fastest_sk = 0;
 	pr_info ( "acking on fast path, looking for best sock " );
 
-	fastest_sk = mptcp_find_fastest_path(tcp_sk(meta_sk));
+	fastest_sk = mptcp_find_fastest_path(meta_sk);
 
 	/* should we check against the current sk */
 	if (fastest_sk == sk) {
@@ -1523,29 +1550,6 @@ int mptcp_retransmit_skb(struct sock *meta_sk, struct sk_buff *skb)
 		goto failed;
 	}
 
-	/* MATT additions 
-	 * for fun we see the number of times we haven't sent on the best subflow !
-	 */
-	{
-		struct sock *fastest = mptcp_find_fastest_path(meta_tp);
-
-		/* use that instead */
-		/* MPTCP_INC_STATS(sock_net(meta_sk), MPTCP_MIB_RETRANSSEGS); */
-		if (fastest != subsk) {
-			pr_info ("Not reinjecting on fastest subflow !!!");
-			// TODO check if it is because  
-			// these are unavailable
-			/* what is zero_wnd_test ? */
-			/* if (mptcp_is_temp_unavailable(fastest, skb, false ) ) { */
-			/* } */
-			// isn't public  ?
-			/* else if (mptcp_is_def_unavailable(fastest)) { */
-			/* } */
-			
-			// one can look at mptcp_rr_is_available to see if 
-			// or default get_available_subflow
-		}
-	}
 
 	mss_now = tcp_current_mss(subsk);
 

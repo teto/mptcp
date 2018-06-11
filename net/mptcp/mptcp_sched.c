@@ -323,6 +323,7 @@ retrans:
 					break;
 				}
 
+				/* if available socket is much slower than the one skb was sent on, don't do it */
 				if (4 * tp->srtt_us >= tp_it->srtt_us) {
 					do_retrans = false;
 					break;
@@ -338,9 +339,11 @@ retrans:
 		if (do_retrans && !mptcp_is_def_unavailable(sk)) {
 
 	       if(!mptcp_is_temp_unavailable(sk, skb_head, false)) {
+			   	// we should only check against these for the fastest sk
+				// 
 				return skb_head;
 			}
-			pr_info ("missed opportunity");
+			/* pr_info ("missed opportunity"); */
 		}
 	}
 
@@ -428,7 +431,7 @@ static struct sk_buff *mptcp_next_segment(struct sock *meta_sk,
 		skb = mptcp_rcv_buf_optimization(*subsk, 1);
 		if (skb) {
 			pr_info ("OPPO penalty SUCCESSFUL opportunistic reinjection");
-			*reinject = -1;
+			*reinject = -2;
 		}
 		else {
 			pr_info ("OPPO penalty failed opportunistic reinjection");

@@ -49,7 +49,7 @@ mptcp_send_ack_on_fast_path
 
 ==== REINJECTIONS RELATED ===
 - mptcp_is_reinjected / MPTCP_REINJECT
-- mptcp_reinject_data -> __mptcp_reinject_data vont reinjecter le paquet dans la
+- mptcp_reinject_data (appele pour les cas particuliers) -> __mptcp_reinject_data vont reinjecter le paquet dans la
 meta->reinject_queue donc pas besoin de les tracer
 - mptcp_sub_send_loss_probe -> __mptcp_reinject_data donc pas besoin de tracer
 - mptcp_meta_retransmit_timer -> mptcp_retransmit_skb calls -> get_subflow ->
@@ -57,6 +57,7 @@ __tcp_push_pending_frames  => on doit le tracer
 - seen in mptcp_push_pending_frames
 	 "But, MPTCP also checks packets_out, as this is an
 	 indication that we might want to do opportunistic reinjection."
+- mptcp_write_xmit -> mptcp_skb_entail
 
 > maybe in get_subflow we could 
 
@@ -70,6 +71,8 @@ mptcp_rcv_buf_optimization qui fait la reinjection opportuniste:
  * reinject queue. Sets it to 0 if it is the regular send-head of the meta-sk,
  * and sets it to -1 if it is a meta-level retransmission to optimize the
  * receive-buffer. */
+
+I modified next_segment to return -2 for opportunistic reinjection with penalty.
 
 an skb records on which path it is delivered via mptcp_pi_to_flag(tp->mptcp->path_index) & TCP_SKB_CB(skb)->path_mask;
 (see mptcp_dont_reinject_skb)
@@ -146,3 +149,10 @@ __tcp_ack_snd_check -> mptcp dataack on fastest path
 
 Probes:
 - tcp_send_loss_probe
+
+
+Experience:
+Pour voir une amelioration il ne faut pas que le sous-flot soit bcp plus lent
+aka si
+	if (4 * tp->srtt_us >= tp_it->srtt_us) {
+alors on ne reinjecte pas dessus.
