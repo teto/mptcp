@@ -347,7 +347,9 @@ static void bictcp_cong_avoid(struct sock *sk, u32 ack, u32 acked)
 			return;
 	}
 	bictcp_update(ca, tp->snd_cwnd, acked);
+	printk (KERN_DEBUG "before tcp_cong_avoid_ai %u", tp->snd_cwnd_clamp );
 	tcp_cong_avoid_ai(tp, ca->cnt, acked);
+	printk (KERN_DEBUG "after tcp_cong_avoid_ai %u", tp->snd_cwnd_clamp );
 }
 
 static u32 bictcp_recalc_ssthresh(struct sock *sk)

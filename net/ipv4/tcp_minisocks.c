@@ -562,7 +562,30 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 	}
 	if (ireq->saw_mpc)
 		newtp->tcp_header_len += MPTCP_SUB_LEN_DSM_ALIGN;
+
+	/* TODO check this is ok ? it's overriden later by our code */ 
+	/* also check for redundancy */
 	newtp->tsoffset = treq->ts_off;
+	/* start of the merge */
+
+		newtp->rx_opt.tstamp_ok = ireq->tstamp_ok;
+		/* This is old code: remove ? */
+		/* if ((newtp->rx_opt.sack_ok = ireq->sack_ok) != 0) { */
+		/* 	if (sysctl_tcp_fack) */
+		/* 		tcp_enable_fack(newtp); */
+		/* } */
+
+		if (newtp->rx_opt.tstamp_ok) {
+			newtp->rx_opt.ts_recent = req->ts_recent;
+			newtp->rx_opt.ts_recent_stamp = ktime_get_seconds();
+			newtp->tcp_header_len = sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
+		} else {
+			newtp->rx_opt.ts_recent_stamp = 0;
+			newtp->tcp_header_len = sizeof(struct tcphdr);
+		}
+		if (ireq->saw_mpc)
+			newtp->tcp_header_len += MPTCP_SUB_LEN_DSM_ALIGN;
+		newtp->tsoffset = 0;
 #ifdef CONFIG_TCP_MD5SIG
 	newtp->md5sig_info = NULL;	/*XXX*/
 	if (newtp->af_specific->md5_lookup(sk, newsk))
@@ -758,9 +781,19 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	}
 
 	/* In sequence, PAWS is OK. */
-
-	if (tmp_opt.saw_tstamp && !after(TCP_SKB_CB(skb)->seq, tcp_rsk(req)->rcv_nxt))
+	/* SYN_RECV mode a priori */
+	if (tmp_opt.saw_tstamp && !after(TCP_SKB_CB(skb)->seq, tcp_rsk(req)->rcv_nxt)) {
 		req->ts_recent = tmp_opt.rcv_tsval;
+
+		/* a few lines before we have tmp_opt.ts_recent = req->ts_recent; */
+		/* TODO change to be more correct */
+		/* if (tmp_opt.tstamp_extended > 2) { */
+		if (sysctl_tcp_timestamps > 2) {
+			mptcp_debug("%s: Connection request: setting tsecr to %u", __func__, tmp_opt.rcv_tsecr);
+			req->ts_recent = tcp_time_stamp_extended - tmp_opt.rcv_tsval;
+			/* SYN_RCVD so should already be ok ? req->tstamp_extended = 1; */
+		}
+	}
 
 	if (TCP_SKB_CB(skb)->seq == tcp_rsk(req)->rcv_isn) {
 		/* Truncate SYN, it is out of window starting

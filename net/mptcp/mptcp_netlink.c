@@ -1222,8 +1222,13 @@ mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
 		 * check it's not changed somewhere else ?
 		 * clamp it to the initial CW ?
 		 */
+
+
+		/* WARRRRNNNIIIING !!!!!!! HARDCODED value just for testing */
 		tcp_sk(subsk)->snd_cwnd_clamp = cwnd_clamp;
+		/* tcp_sk(subsk)->snd_cwnd_clamp = 3; */
 		mptcp_debug ( "%s: SUCCESS !! Clamped window was called and set to %u !", __func__, cwnd_clamp);
+		mptcp_debug ( "%s: snd_cwnd_clamp %u !", __func__, tcp_sk(subsk)->snd_cwnd_clamp);
 		mptcp_dump_sf_info (subsk);
 
 	} else {

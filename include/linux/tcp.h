@@ -137,14 +137,20 @@ struct tcp_out_options {
 #define TCP_SACK_SEEN     (1 << 0)   /*1 = peer is SACK capable, */
 #define TCP_DSACK_SEEN    (1 << 2)   /*1 = DSACK was received from peer*/
 
+#define TCP_TSEXT_EXO_MASK     (1 << 31) /* most significant bit of the tcp timestamp */
+#define TCP_TSEXT_VERSION_MASK (0x60000000) /* bits that match version field */
+
 struct tcp_options_received {
 /*	PAWS/RTTM data	*/
 	int	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
 	u32	ts_recent;	/* Time stamp to echo next		*/
-	u32	rcv_tsval;	/* Time stamp value             	*/
-	u32	rcv_tsecr;	/* Time stamp echo reply        	*/
+	u32	rcv_tsval;	/* raw Time stamp value             	*/
+	u32	rcv_tsecr;	/* raw Time stamp echo reply        	*/
 	u16 	saw_tstamp : 1,	/* Saw TIMESTAMP on last packet		*/
 		tstamp_ok : 1,	/* TIMESTAMP seen on SYN packet		*/
+		tstamp_extended : 3,    /* Extended timestamp version number
+								(0 if not negociated, 1 => with offset, 2 => without offset)
+								(TODO rename to tstamp_version, merge with tstamp_ok ?) */
 		dsack : 1,	/* D-SACK is scheduled			*/
 		wscale_ok : 1,	/* Wscale seen on SYN packet		*/
 		sack_ok : 3,	/* SACK seen on SYN packet		*/
@@ -162,6 +168,7 @@ struct mptcp_tcp_sock;
 static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
 {
 	rx_opt->tstamp_ok = rx_opt->sack_ok = 0;
+	rx_opt->tstamp_extended = 0;
 	rx_opt->wscale_ok = rx_opt->snd_wscale = 0;
 #if IS_ENABLED(CONFIG_SMC)
 	rx_opt->smc_ok = 0;
@@ -249,12 +256,15 @@ struct tcp_sock {
  	u32	snd_una;	/* First byte we want an ack for	*/
  	u32	snd_sml;	/* Last byte of the most recently transmitted small packet */
 	u32	rcv_tstamp;	/* timestamp of last received ACK (for keepalives) */
+					/* /!\ we hijack its meaning in tcp_syn_options */
 	u32	lsndtime;	/* timestamp of last sent data packet (for restart window) */
 	u32	last_oow_ack_time;  /* timestamp of last out-of-window ACK */
 	u32	compressed_ack_rcv_nxt;
 
-	u32	tsoffset;	/* timestamp offset */
+	u32	tsoffset;	/* timestamp offset (influenced by TCP_TIMESTAMP and sysctl 
+					   * value starting from kernel 4.10 */
 
+	u32 tsext_precision; /* ts extended precision TODO move to tcp_options_received ? */
 	struct list_head tsq_node; /* anchor in tsq_tasklet.head list */
 	struct list_head tsorted_sent_queue; /* time-sorted sent but un-SACKed skbs */
 
@@ -309,6 +319,19 @@ struct tcp_sock {
 
 /* RTT measurement */
 	u64	tcp_mstamp;	/* most recent packet received/sent */
+/* could be factorized with OWD variant. rename some fields too ? */
+
+	struct tcp_delay_est {
+		u32	delay_us;	/* smoothed round trip time << 3 in usecs */
+		u32	mdev_us;	/* medium deviation			*/
+		u32	mdev_max_us;	/* maximal mdev for the last rtt period	*/
+		u32	rttvar_us;	/* smoothed mdev_max			*/
+		u32	rtt_seq;	/* sequence number to update rttvar	*/
+
+		struct  minmax rtt_min;
+	} owd_out, owd_in;
+	/* u32 syn_ts; /1* save the initial syn *1/ */
+
 	u32	srtt_us;	/* smoothed round trip time << 3 in usecs */
 	u32	mdev_us;	/* medium deviation			*/
 	u32	mdev_max_us;	/* maximal mdev for the last rtt period	*/
@@ -424,6 +447,18 @@ struct tcp_sock {
 		u32	seq;
 		u64	time;
 	} rcv_rtt_est;
+
+/* Receiver side OWD estimation
+ * this can be used to store the initial timestamp
+ * or TODO check that 'lsndtime' can be used
+ * could have called it ott but was too easy to mistake with rtt
+ * TODO maybe it should be 
+ * */
+	struct {
+		u32	owd; /* we might use sthg more precise */
+		u32	seq;
+		u32	time;
+	} rcv_owd_est;
 
 /* Receiver queue space */
 	struct {

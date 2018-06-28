@@ -184,6 +184,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 #define TCPOPT_TIMESTAMP	8	/* Better RTT estimations/PAWS */
 #define TCPOPT_MD5SIG		19	/* MD5 Signature (RFC2385) */
 #define TCPOPT_MPTCP		30
+#define TCPOPT_OWD             31   /* evolved version of TS  */
 #define TCPOPT_FASTOPEN		34	/* Fast open (RFC7413) */
 #define TCPOPT_EXP		254	/* Experimental */
 /* Magic number to be after the option value for sharing TCP
@@ -890,6 +891,55 @@ static inline u32 tcp_stamp_us_delta(u64 t1, u64 t0)
 	return max_t(s64, t1 - t0, 0);
 }
 
+/* MATT here we redefine tcp_time_stamp
+ * a list of candidates */
+/* ktime_get_real_seconds
+getnstimeofday64
+current_kernel_time64
+current_kernel_time
+timekeeping_get_ns NO
+ktime_get_raw_fast_ns
+ktime_get_mono_fast_ns
+ktime_get_ts64
+ktime_get_raw
+ktime_get_resolution_ns ( 	WARN_ON(timekeeping_suspended); )
+*/
+/* TODO need to return 32 bits */
+/* #define tcp_time_stamp_extended */
+/* only fits 32 bits */
+/* TODO pass a bool to know if we need an absolute or relative owd 
+ * we might choose to use different fast/slow functions
+ * */
+
+#define tcp_time_stamp_extended		((__u32)(tcp_time_stamp_extended_func()))
+
+static inline u32 tcp_time_stamp_extended_func (void) {
+	/*
+	 * Look into include/linux/timekeeping.h to retreive time
+	 * then use include/linux/ktime.h
+	 */
+	/* struct timespec ts; */
+	/* struct timespec64 ts64; */
+/* http://www.fieldses.org/~bfields/kernel/time.txt */
+	/* in microseconds */
+ 
+	 /* long long int nsTime = ktime_to_ns(ktime_get()); */
+	 /* The ktime_get() function returns ktime_t */
+		 /* do_gettimeofday() */
+
+	/* ktime_get_real_ns */
+	/* ktime_get_real_ts64(&ts64); */
+	/* jiffies_to_timespec */
+		/* ktime_get_clocktai */
+	/* u64 ktime_get_tai_ns() */
+	/* timekeeping_clocktai(&ts); */
+	ktime_t t = ktime_get_clocktai();
+	s64 result = ktime_to_ms(t);
+
+	/* if clocks are in sync we can drop MSB */
+	return result;
+}
+
 static inline u32 tcp_skb_timestamp(const struct sk_buff *skb)
 {
 	return div_u64(skb->skb_mstamp_ns, NSEC_PER_SEC / TCP_TS_HZ);
@@ -1585,6 +1635,12 @@ static inline int tcp_fin_time(const struct sock *sk)
 static inline bool tcp_paws_check(const struct tcp_options_received *rx_opt,
 				  int paws_win)
 {
+	if (rx_opt->tstamp_extended) {
+		/* as a temporary measure 
+		 * todo should compare value with RTT and measured owd, to detect changes
+		 * */
+		return true;
+	}
 	if ((s32)(rx_opt->ts_recent - rx_opt->rcv_tsval) <= paws_win)
 		return true;
 	if (unlikely(!time_before32(ktime_get_seconds(),
@@ -1597,6 +1653,8 @@ static inline bool tcp_paws_check(const struct tcp_options_received *rx_opt,
 	 */
 	if (!rx_opt->ts_recent)
 		return true;
+
+	pr_warn("PAWS failure !! ");
 	return false;
 }
 
