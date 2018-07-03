@@ -273,7 +273,7 @@ found:
 static struct mptcp_sched_ops mptcp_sched_matt = {
 	.get_subflow = matt_get_available_subflow,
 	.next_segment = mptcp_next_segment,
-	.name = "roundrobin",
+	.name = "prevenant",
 	.owner = THIS_MODULE,
 };
 
