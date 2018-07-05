@@ -113,10 +113,11 @@ static void mptcp_find_and_set_pathmask(const struct sock *meta_sk, struct sk_bu
 
 /* now that we have OWDs, we can tell if we received a DACK 
  * 
- * direction set to != 0 for reverse path
+ * direction forward if >= 0 else backward
  */
 struct sock* mptcp_find_fastest_path(
-	const struct sock *meta_sk
+	const struct sock *meta_sk,
+	int direction
 		/* struct sock *sk */
 )
 {
@@ -126,7 +127,7 @@ struct sock* mptcp_find_fastest_path(
 	struct sock *sk_it, *sk_tmp;
 	struct tcp_sock *tp_fastest = 0;
 
-	pr_info ("Looking for fastest path");
+	pr_info ("Looking for fastest path in direction %s", direction ? "forward" : "backward");
 
 	/* look for the fastest backward path 
 	 * why do we have struct inet_connection_sock { 
@@ -140,13 +141,22 @@ struct sock* mptcp_find_fastest_path(
 		}
 
 		pr_info ("Comparing %u with current fastest %u", tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
-		if (tp_it->owd_out.delay_us < tp_fastest->owd_out.delay_us) {
+		if (direction >= 0) {
+			if (tp_it->owd_out.delay_us < tp_fastest->owd_out.delay_us) {
 
-			tp_fastest = tp_it;
-			pr_info ( "sowd of %u beats %u ",  tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
+				tp_fastest = tp_it;
+				pr_info ( "sowd of %u beats %u ",  tp_it->owd_out.delay_us, tp_fastest->owd_out.delay_us);
+			}
+		/* backward direction */ 
+		} else {
+			if (tp_it->owd_in.delay_us < tp_fastest->owd_in.delay_us) {
+
+				tp_fastest = tp_it;
+				pr_info ( "sowd of %u beats %u ",  tp_it->owd_in.delay_us, tp_fastest->owd_in.delay_us);
+			}
+
 		}
 	}
-
 
 	/* tcp_sk.inet_conn.icsk_inet.sk */
 	return (struct sock*)tp_fastest;

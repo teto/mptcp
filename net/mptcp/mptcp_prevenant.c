@@ -171,6 +171,11 @@ static struct sk_buff *__mptcp_matt_next_segment(const struct sock *meta_sk, int
 	return skb;
 }
 
+/**
+ * We need to find the fastest subflow first
+ *
+ *
+ */
 static struct sk_buff *mptcp_matt_next_segment(struct sock *meta_sk,
 					     int *reinject,
 					     struct sock **subsk,
@@ -181,6 +186,8 @@ static struct sk_buff *mptcp_matt_next_segment(struct sock *meta_sk,
 	struct sk_buff *skb = __mptcp_matt_next_segment(meta_sk, reinject);
 	unsigned char split = num_segments;
 	unsigned char iter = 0, full_subs = 0;
+
+	struct sock *sk_it = mptcp_find_fastest_path()
 
 	/* As we set it, we have to reset it as well. */
 	*limit = 0;
