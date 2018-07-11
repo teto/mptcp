@@ -711,13 +711,16 @@ static void tcp_event_data_recv(struct sock *sk, struct sk_buff *skb)
   See original tcp_rtt_estimator for good code
 del_est
 mdev = medium deviation
+	mes_delay is the measured delay. Dimension depends on tsext_precision
  */
-static void tcp_owd_estimator(struct tcp_sock *tp, struct tcp_delay_est* est, long mes_delay_us)
+static void tcp_owd_estimator(struct tcp_sock *tp, struct tcp_delay_est* est, long mes_delay)
 {
 	/* struct tcp_sock *tp = tcp_sk(sk); */
 	long m = mes_delay_us; /* owd */
 	u32 delay = est->delay_us; /* rename to smooth delay */
 
+	if (tp->tsext_precision) {
+	}
 	/*	The following amusing code comes from Jacobson's
 	 *	article in SIGCOMM '88.  Note that rtt and mdev
 	 *	are scaled versions of rtt and mean deviation.
@@ -3616,10 +3619,10 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 				__func__, tp->rx_opt.ts_recent, now, tp->rx_opt.rcv_tsval, ((struct sock *) tp) -> __sk_common.skc_rcv_saddr);
 		/* 	 TODO should we do it here or later ?*/
 		printk("OWD: estimate ts with ts_recent = %u", tp->rx_opt.ts_recent);
-	  	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent*1000);
+	  	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);
 		/* check it 's not 0 */
 		printk("OWD: estimate ts with ecr = %u", tp->rx_opt.rcv_tsecr);
-		tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr*1000);
+		tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr);
 		printk("estimated OWD = %u, srcaddr = %x", tp->owd_out.delay_us >> 3, ((struct sock *) tp) -> __sk_common.skc_rcv_saddr);		
 	} else {
 		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;

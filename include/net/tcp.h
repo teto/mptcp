@@ -833,53 +833,34 @@ void tcp_send_window_probe(struct sock *sk);
  */
 #define tcp_time_stamp		((__u32)(jiffies))
 
-/* MATT here we redefine tcp_time_stamp
- * a list of candidates */
-/* ktime_get_real_seconds
-getnstimeofday64
-current_kernel_time64
-current_kernel_time
-timekeeping_get_ns NO
-ktime_get_raw_fast_ns
-ktime_get_mono_fast_ns
-ktime_get_ts64
-ktime_get_raw
-ktime_get_resolution_ns ( 	WARN_ON(timekeeping_suspended); )
-*/
-/* TODO need to return 32 bits */
-/* #define tcp_time_stamp_extended */
-/* only fits 32 bits */
-/* TODO pass a bool to know if we need an absolute or relative owd 
- * we might choose to use different fast/slow functions
- * */
-
 #define tcp_time_stamp_extended		((__u32)(tcp_time_stamp_extended_func()))
 
-static inline u64 tcp_time_stamp_extended_func (void) {
-	/*
-	 * Look into include/linux/timekeeping.h to retreive time
-	 * then use include/linux/ktime.h
-	 */
-	/* struct timespec ts; */
-	/* struct timespec64 ts64; */
-/* http://www.fieldses.org/~bfields/kernel/time.txt */
-	/* in microseconds */
- 
-	 /* long long int nsTime = ktime_to_ns(ktime_get()); */
-	 /* The ktime_get() function returns ktime_t */
-		 /* do_gettimeofday() */
 
-	/* ktime_get_real_ns */
-	/* ktime_get_real_ts64(&ts64); */
-	/* jiffies_to_timespec */
-		/* ktime_get_clocktai */
-	/* u64 ktime_get_tai_ns() */
-	/* timekeeping_clocktai(&ts); */
+/* when using tcp timestamp extended 
+ * 
+ */ 
+#define TCP_TS_PRECISION 1
+
+static inline u64 tcp_time_stamp_extended_func (void) {
+	/* Look into include/linux/timekeeping.h to retreive time
+	 * then use include/linux/ktime.h
+	 * http://www.fieldses.org/~bfields/kernel/time.txt
+	 * Use tai time so that it is consistent across computers
+	 * TODO make it precision dependant tsext_precision
+	 */
+
+	 /* long long int nsTime = ktime_to_ns(ktime_get()); */
 	ktime_t t = ktime_get_clocktai();
-	s64 result = ktime_to_ms(t);
+
+	/* ktime_to_us */
+	u32 precision = TCP_TS_PRECISION;
+		/* tcp_ts_interval(); */
+	if () {
+		s64 result = ktime_to_ms(t);
+	}
 
 	/* if clocks are in sync we can drop MSB */
-	return result;
+	return (u64)result;
 }
 
 static inline u32 tcp_skb_timestamp(const struct sk_buff *skb)

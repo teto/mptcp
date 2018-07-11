@@ -107,6 +107,8 @@ static inline __u32 tcp_acceptable_seq(const struct sock *sk)
 /* https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
  * follows the specs in "encoding of timestamp intervals"
  * strictly positive
+ * For now we restrict ourselves to simpler precisions
+ * like 
  */
 static inline u32 tcp_ts_interval (void)
 {
@@ -115,10 +117,10 @@ static inline u32 tcp_ts_interval (void)
 	* extended timestamps will get disabled
 	*/
 	/* long ns_prec = 1/CLOCKS_PER_SEC * 1000000000; */
-	/* u32 ns_prec = ktime_get_resolution_ns(); */
+	u32 ns_prec = ktime_get_resolution_ns();
 
 	/* can be 0 careful */
-	/* pr_info("clock precision of %uns", ns_prec); */
+	pr_info("clock precision of %uns", ns_prec);
 	/* return max_t(u32, ns_prec, 1); */
 	return 1;
 }
@@ -612,7 +614,7 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 			WARN(opts->tsecr != 0, "tsecr should not be null");
 			// write an inline function
 			/* opts->tsecr = TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x1fff & tcp_ts_interval()); */
-			opts->tsval = tcp_time_stamp_extended;
+			opts->tsval = tcp_time_stamp_extended();
 			opts->tsecr = tcp_timestamp_extended_option();
 			tp->retrans_stamp = opts->tsval;
 				/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
