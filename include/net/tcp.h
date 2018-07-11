@@ -855,7 +855,7 @@ ktime_get_resolution_ns ( 	WARN_ON(timekeeping_suspended); )
 
 #define tcp_time_stamp_extended		((__u32)(tcp_time_stamp_extended_func()))
 
-static inline u32 tcp_time_stamp_extended_func (void) {
+static inline u64 tcp_time_stamp_extended_func (void) {
 	/*
 	 * Look into include/linux/timekeeping.h to retreive time
 	 * then use include/linux/ktime.h

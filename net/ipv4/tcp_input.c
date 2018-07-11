@@ -768,6 +768,7 @@ static void tcp_owd_estimator(struct tcp_sock *tp, struct tcp_delay_est* est, lo
 		est->rtt_seq = tp->snd_nxt;
 	}
 	est->delay_us = max(1U, delay);
+        printk("returned estimation = %u us (%u >> 3), srcaddr = %x", est->delay_us >> 3, est->delay_us, ((struct sock *) tp) -> __sk_common.skc_rcv_saddr);
 }
 
 /* Called to compute a smoothed rtt estimate. The data fed to this
@@ -3611,13 +3612,15 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 		}
 		tp->rx_opt.ts_recent = now - tp->rx_opt.rcv_tsval;
 		/* too verbose */
-		mptcp_debug("%s: storing ts_recent: %u = current time (%u) - tsval (%u)", 
-				__func__, tp->rx_opt.ts_recent, now, tp->rx_opt.rcv_tsval);
+		printk("%s: storing ts_recent: %u = current time (%u) - tsval (%u), srcaddr = %x", 
+				__func__, tp->rx_opt.ts_recent, now, tp->rx_opt.rcv_tsval, ((struct sock *) tp) -> __sk_common.skc_rcv_saddr);
 		/* 	 TODO should we do it here or later ?*/
-	  	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);
+		printk("OWD: estimate ts with ts_recent = %u", tp->rx_opt.ts_recent);
+	  	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent*1000);
 		/* check it 's not 0 */
-		tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr);
-
+		printk("OWD: estimate ts with ecr = %u", tp->rx_opt.rcv_tsecr);
+		tcp_owd_estimator(tp, &tp->owd_out, tp->rx_opt.rcv_tsecr*1000);
+		printk("estimated OWD = %u, srcaddr = %x", tp->owd_out.delay_us >> 3, ((struct sock *) tp) -> __sk_common.skc_rcv_saddr);		
 	} else {
 		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
 	}
@@ -4038,6 +4041,8 @@ static bool tcp_parse_aligned_timestamp(struct tcp_sock *tp, const struct tcphdr
 		tp->rx_opt.saw_tstamp = 1;
 		++ptr;
 		tp->rx_opt.rcv_tsval = ntohl(*ptr);
+		if(*ptr > 1000000000)
+			printk("received timestamp = %u\n", *ptr);
 		++ptr;
 		if (*ptr) {
 			tp->rx_opt.rcv_tsecr = ntohl(*ptr) - tp->tsoffset;
@@ -6064,7 +6069,8 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			tp->advmss	    -= TCPOLEN_TSTAMP_ALIGNED;
 			mptcp_debug("%s: this part was left untouched, tststamp_extended=%u", 
 					__func__, tp->rx_opt.tstamp_extended);
-			tcp_store_ts_recent(tp);
+			// from francois
+			//tcp_store_ts_recent(tp);
 		} else {
 			tp->tcp_header_len = sizeof(struct tcphdr);
 		}
