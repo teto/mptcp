@@ -79,6 +79,7 @@
 #include <net/mptcp_v4.h>
 #include <net/mptcp_v6.h>
 
+int sysctl_tcp_timestamps_precision __read_mostly = TCP_TSEXT_PRECISION_MS;
 int sysctl_tcp_timestamps __read_mostly = 1;
 int sysctl_tcp_window_scaling __read_mostly = 1;
 int sysctl_tcp_sack __read_mostly = 1;
@@ -712,15 +713,17 @@ static void tcp_event_data_recv(struct sock *sk, struct sk_buff *skb)
 del_est
 mdev = medium deviation
 	mes_delay is the measured delay. Dimension depends on tsext_precision
+	TODO rename the us variables
  */
 static void tcp_owd_estimator(struct tcp_sock *tp, struct tcp_delay_est* est, long mes_delay)
 {
 	/* struct tcp_sock *tp = tcp_sk(sk); */
-	long m = mes_delay_us; /* owd */
+	long m = mes_delay; /* owd */
 	u32 delay = est->delay_us; /* rename to smooth delay */
 
-	if (tp->tsext_precision) {
-	}
+	/* if (tp->tsext_precision != TCP_TSEXT_PRECISION_US) { */
+	/* } */
+
 	/*	The following amusing code comes from Jacobson's
 	 *	article in SIGCOMM '88.  Note that rtt and mdev
 	 *	are scaled versions of rtt and mean deviation.
@@ -771,7 +774,13 @@ static void tcp_owd_estimator(struct tcp_sock *tp, struct tcp_delay_est* est, lo
 		est->rtt_seq = tp->snd_nxt;
 	}
 	est->delay_us = max(1U, delay);
-        printk("returned estimation = %u us (%u >> 3), srcaddr = %x", est->delay_us >> 3, est->delay_us, ((struct sock *) tp) -> __sk_common.skc_rcv_saddr);
+
+	printk("returned estimation = %u us (%u >> 3), srcaddr = %x  (shared precision %d)", 
+			est->delay_us >> 3,
+			est->delay_us,
+			((struct sock *) tp) -> __sk_common.skc_rcv_saddr,
+			tp->tsext_precision
+	);
 }
 
 /* Called to compute a smoothed rtt estimate. The data fed to this
@@ -3605,7 +3614,7 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 		/* printk ("Storing recent value");
 		 * computes OWD, updates the value too
 		 */
-		u32 now= tcp_time_stamp_extended;
+		u32 now = tcp_time_stamp_extended(tp->tsext_precision);
 		if (now <=  tp->rx_opt.rcv_tsval) {
 			pr_warn("%s: ignore measurement, one of the ts counter has wrapped now=%u received tsval=%u (would result in %u)", 
 					__func__, now, tp->rx_opt.rcv_tsval,
@@ -6598,6 +6607,10 @@ static void tcp_openreq_init(struct request_sock *req,
 		/* + 1 so that it's not 0 even when version is 0 */
 		? ((rx_opt->rcv_tsecr & 0x6f000000) >> 29) + 1 : 0;
 	ireq->tsext_precision = 0x00ffffff & rx_opt->rcv_tsecr;
+    mptcp_debug ("requested a precision of %d (ms=%d us=%d)", ireq->tsext_precision,
+			TCP_TSEXT_PRECISION_MS, TCP_TSEXT_PRECISION_US);
+
+	ireq->tsext_precision =	min(ireq->tsext_precision, sysctl_tcp_timestamps_precision);
     mptcp_debug ("ts_extended version=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u client precision=%uns",
 			ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent, ireq->tsext_precision);
 }

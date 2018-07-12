@@ -187,7 +187,7 @@ static struct sk_buff *mptcp_matt_next_segment(struct sock *meta_sk,
 	unsigned char split = num_segments;
 	unsigned char iter = 0, full_subs = 0;
 
-	struct sock *sk_it = mptcp_find_fastest_path()
+	struct sock *sk_fast = mptcp_find_fastest_path(meta_sk, 1);
 
 	/* As we set it, we have to reset it as well. */
 	*limit = 0;
@@ -263,7 +263,7 @@ found:
 			return NULL;
 
 		*subsk = choose_sk;
-		mss_now = tcp_cumattent_mss(*subsk);
+		mss_now = tcp_current_mss(*subsk);
 		*limit = split * mss_now;
 
 		if (skb->len > mss_now)
@@ -279,7 +279,7 @@ found:
 
 static struct mptcp_sched_ops mptcp_sched_matt = {
 	.get_subflow = matt_get_available_subflow,
-	.next_segment = mptcp_next_segment,
+	.next_segment = mptcp_matt_next_segment,
 	.name = "prevenant",
 	.owner = THIS_MODULE,
 };

@@ -126,12 +126,12 @@ static inline u32 tcp_ts_interval (void)
 }
 
 
-static inline __u32 tcp_timestamp_extended_option(void)
+static inline __u32 tcp_timestamp_extended_option(u32 precision)
 {
 	/* version on 2 bits 
 	 * value wallclock => 1
 	 */
-	return TCP_TSEXT_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x00ffffff & tcp_ts_interval());
+	return TCP_TSEXT_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x00ffffff & precision);
 }
 
 /* Calculate mss to advertise in SYN segment.
@@ -614,8 +614,8 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 			WARN(opts->tsecr != 0, "tsecr should not be null");
 			// write an inline function
 			/* opts->tsecr = TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x1fff & tcp_ts_interval()); */
-			opts->tsval = tcp_time_stamp_extended();
-			opts->tsecr = tcp_timestamp_extended_option();
+			opts->tsval = tcp_time_stamp_extended(sysctl_tcp_timestamps_precision);
+			opts->tsecr = tcp_timestamp_extended_option(sysctl_tcp_timestamps_precision);
 			tp->retrans_stamp = opts->tsval;
 				/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
 			 * look at retrans_stamp instead */
@@ -700,8 +700,8 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 
 		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
 			/* return sender tsval XOR our config. */
-			opts->tsval = tcp_time_stamp_extended;
-			opts->tsecr = req->ts_recent ^ tcp_timestamp_extended_option();
+			opts->tsval = tcp_time_stamp_extended(ireq->tsext_precision);
+			opts->tsecr = req->ts_recent ^ tcp_timestamp_extended_option(ireq->tsext_precision);
 			mptcp_debug ("%s: extended ts, reusing syn tsval=%u, sending tsecr=%u (xoring option with syn.tsval %u)",
 					__func__, 
 					req->ts_recent,
@@ -770,7 +770,7 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 			/* getnstimeofday64 */
 
 			/* mptcp_debug("%s: a priori sending", __func__); */
-			opts->tsval = tcp_time_stamp_extended + tp->tsoffset;
+			opts->tsval = tcp_time_stamp_extended(tp->tsext_precision) + tp->tsoffset;
 		}
 
 		/* In extended mode, the ts_recent value was already changed to the

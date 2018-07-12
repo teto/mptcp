@@ -258,6 +258,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 extern struct inet_timewait_death_row tcp_death_row;
 
 /* sysctl variables for tcp */
+extern int sysctl_tcp_timestamps_precision;
 extern int sysctl_tcp_timestamps;
 extern int sysctl_tcp_window_scaling;
 extern int sysctl_tcp_sack;
@@ -833,15 +834,18 @@ void tcp_send_window_probe(struct sock *sk);
  */
 #define tcp_time_stamp		((__u32)(jiffies))
 
-#define tcp_time_stamp_extended		((__u32)(tcp_time_stamp_extended_func()))
+#define tcp_time_stamp_extended(x)		((__u32)(tcp_time_stamp_extended_func( (x) )))
 
 
 /* when using tcp timestamp extended 
  * 
  */ 
-#define TCP_TS_PRECISION 1
+/* #define TCP_TS_PRECISION 1 */
 
-static inline u64 tcp_time_stamp_extended_func (void) {
+#define TCP_TSEXT_PRECISION_MS 1
+#define TCP_TSEXT_PRECISION_US 2
+
+static inline u64 tcp_time_stamp_extended_func (u32 precision) {
 	/* Look into include/linux/timekeeping.h to retreive time
 	 * then use include/linux/ktime.h
 	 * http://www.fieldses.org/~bfields/kernel/time.txt
@@ -853,10 +857,17 @@ static inline u64 tcp_time_stamp_extended_func (void) {
 	ktime_t t = ktime_get_clocktai();
 
 	/* ktime_to_us */
-	u32 precision = TCP_TS_PRECISION;
-		/* tcp_ts_interval(); */
-	if () {
-		s64 result = ktime_to_ms(t);
+	/* u32 precision = TCP_TS_PRECISION; */
+	/* u32 precision = tp->tsext_precision; */
+	s64 result = -42;
+
+	/* tcp_ts_interval(); */
+	if (precision == TCP_TSEXT_PRECISION_MS) {
+		 result = ktime_to_ms(t);
+	} else if (precision == TCP_TSEXT_PRECISION_US) {
+		 result = ktime_to_us(t);
+	} else {
+		pr_err("Wrong precision %d", precision);
 	}
 
 	/* if clocks are in sync we can drop MSB */

@@ -571,6 +571,8 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 			/* mptcp_debug("setting ts_recent_stamp to "); */
 			newtp->rx_opt.ts_recent = req->ts_recent;
 			newtp->rx_opt.ts_recent_stamp = get_seconds();
+
+			/* min(ireq->tsext_precision, sysctl_tcp_timestamps_precision) */
 			newtp->tsext_precision = ireq->tsext_precision;
 			newtp->tcp_header_len = sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
 		} else {
@@ -785,7 +787,8 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 		/* if (tmp_opt.tstamp_extended > 2) { */
 		if (sysctl_tcp_timestamps > 2) {
 			mptcp_debug("%s: Connection request: setting tsecr to %u", __func__, tmp_opt.rcv_tsecr);
-			req->ts_recent = tcp_time_stamp_extended - tmp_opt.rcv_tsval;
+			/* TODO what precision should we use then ? */ 
+			req->ts_recent = tcp_time_stamp_extended(sysctl_tcp_timestamps_precision) - tmp_opt.rcv_tsval;
 			/* SYN_RCVD so should already be ok ? req->tstamp_extended = 1; */
 		}
 	}

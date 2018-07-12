@@ -6,6 +6,9 @@ tcp_timestamps
 3=wallclock + random offset
 4=wallclock
 
+tcp_timestamps_precision = look for TCP_TSEXT_PRECISION_MS (1)
+
+
 tcp_transmit_skb adds the options (either tcp_syn_options or tcp_established)
 
 tp->retrans_stamp is used in syn

@@ -571,7 +571,7 @@ static int mptcp_skb_entail(struct sock *sk, struct sk_buff *skb, int reinject)
 		/* MATT additions 
 		* for fun we see the number of times we haven't sent on the best subflow !
 		*/
-		struct sock *fastest = mptcp_find_fastest_path(meta_sk);
+		struct sock *fastest = mptcp_find_fastest_path(meta_sk, 1);
 
 		/* use that instead */
 		/* MPTCP_INC_STATS(sock_net(meta_sk), MPTCP_MIB_RETRANSSEGS); */
@@ -1024,7 +1024,7 @@ void mptcp_send_ack_on_fast_path(struct sock *sk)
 	struct sock *fastest_sk = 0;
 	pr_info ( "acking on fast path, looking for best sock " );
 
-	fastest_sk = mptcp_find_fastest_path(meta_sk);
+	fastest_sk = mptcp_find_fastest_path(meta_sk, -1);
 
 	/* should we check against the current sk */
 	if (fastest_sk == sk) {

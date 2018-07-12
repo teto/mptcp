@@ -775,6 +775,7 @@ extern struct hlist_nulls_head tk_hashtable[MPTCP_HASH_SIZE];
  */
 #define MPTCP_REQSK_NULLS_BASE (1U << 29)
 
+struct sock* mptcp_find_fastest_path( const struct sock *meta_sk, int direction);
 
 void mptcp_data_ready(struct sock *sk);
 void mptcp_write_space(struct sock *sk);
