@@ -80,6 +80,8 @@
 #include <net/mptcp_v4.h>
 #include <net/mptcp_v6.h>
 
+int sysctl_tcp_timestamps_precision __read_mostly = TCP_TSEXT_PRECISION_MS;
+int sysctl_tcp_timestamps __read_mostly = 1;
 int sysctl_tcp_fack __read_mostly;
 int sysctl_tcp_max_reordering __read_mostly = 300;
 int sysctl_tcp_dsack __read_mostly = 1;
@@ -189,6 +191,45 @@ static void tcp_incr_quickack(struct sock *sk, unsigned int max_quickacks)
 	quickacks = min(quickacks, max_quickacks);
 	if (quickacks > icsk->icsk_ack.quick)
 		icsk->icsk_ack.quick = quickacks;
+
+/* convert ts from peer (negotiated) precision to 
+ * local precision which is assumed to be US
+ * */
+u64 tcp_convert_peer_ts(u32 precision, u32 ts)
+{
+	u64 result = 0;
+
+	/* MS_TO_US */
+
+	/* switch(precision) { */
+	/* 	case TCP_TSEXT_PRECISION_MS: */
+	/* 		result = ktime_to_ms(t); break; */
+	/* 	case TCP_TSEXT_PRECISION_US: */
+	/* 		result = ktime_to_us(t); break; */
+	/* 	case TCP_TSEXT_PRECISION_NS: */
+	/* 		result = ktime_to_ns(t); break; */
+	/* 	case 0: */
+	/* 		result = (s64)tcp_time_stamp; break; */
+	/* 	default: */
+	/* 		pr_err("Wrong precision %d", precision); */
+	/* }; */
+
+	switch(precision) {
+		case TCP_TSEXT_PRECISION_MS:
+			result = ts * 1000; break;
+		case TCP_TSEXT_PRECISION_US:
+			result = ts; break;
+		/* case TCP_TSEXT_PRECISION_NS: */
+		/* 	result = ktime_to_ns(t); break; */
+		case 0:
+			result = (s64)tcp_time_stamp; break;
+		default:
+			pr_err("Wrong precision %d", precision);
+	};
+
+	if (result < 0)
+		pr_err("ts < 0 !!!");
+	return (u64)result;
 }
 
 void tcp_enter_quickack_mode(struct sock *sk, unsigned int max_quickacks)
@@ -717,6 +758,88 @@ static void tcp_event_data_recv(struct sock *sk, struct sk_buff *skb)
 
 	if (skb->len >= 128)
 		tcp_grow_window(sk, skb);
+}
+
+/* Called to compute a smoothed rtt estimate. The data fed to this
+ * routine either comes from timestamps, or from segments that were
+ * known _not_ to have been retransmitted [see Karn/Partridge
+ * Proceedings SIGCOMM 87]. The algorithm is from the SIGCOMM 88
+ * piece by Van Jacobson.
+  See original tcp_rtt_estimator for good code
+del_est
+mdev = medium deviation
+	mes_delay is the measured delay. Dimension depends on tsext_precision
+	TODO rename the us variables
+ */
+static void tcp_owd_estimator(struct tcp_sock *tp, struct tcp_delay_est* est, long mes_delay)
+{
+	/* struct tcp_sock *tp = tcp_sk(sk); */
+	long m = mes_delay; /* owd */
+	u32 delay = est->delay; /* rename to smooth delay */
+	u32 wlen = sysctl_tcp_min_rtt_wlen * HZ;
+
+	/* if (tp->tsext_precision != TCP_TSEXT_PRECISION_US) { */
+	/* } */
+
+	/*	The following amusing code comes from Jacobson's
+	 *	article in SIGCOMM '88.  Note that rtt and mdev
+	 *	are scaled versions of rtt and mean deviation.
+	 *	This is designed to be as fast as possible
+	 *	m stands for "measurement".
+	 *
+	 *	On a 1990 paper the rto value is changed to:
+	 *	RTO = rtt + 4 * mdev
+	 */
+	if (delay != 0) {
+		m -= (delay >> 3);	/* m is now error in rtt est */
+		delay += m;		/* rtt = 7/8 rtt + 1/8 new */
+		if (m < 0) {
+			m = -m;		/* m is now abs(error) */
+			m -= (est->mdev >> 2);   /* similar update on mdev */
+			/* This is similar to one of Eifel findings.
+			 * Eifel blocks mdev updates when rtt decreases.
+			 * This solution is a bit different: we use finer gain
+			 * for mdev in this case (alpha*beta).
+			 * Like Eifel it also prevents growth of rto,
+			 * but also it limits too fast rto decreases,
+			 * happening in pure Eifel.
+			 */
+			if (m > 0)
+				m >>= 3;
+		} else {
+			m -= (est->mdev >> 2);   /* similar update on mdev */
+		}
+		est->mdev += m;		/* mdev = 3/4 mdev + 1/4 new */
+		if (est->mdev > est->mdev_max) {
+			est->mdev_max = est->mdev;
+			if (est->mdev_max > est->rttvar)
+				est->rttvar = est->mdev_max;
+		}
+		if (after(tp->snd_una, est->rtt_seq)) {
+			if (est->mdev_max < est->rttvar)
+				est->rttvar -= (est->rttvar - est->mdev_max) >> 2;
+			est->rtt_seq = tp->snd_nxt;
+			/* est->mdev_max = tcp_rto_min(sk); */
+		}
+	} else {
+		/* no previous measure. */
+		delay = m << 3;		/* take the measured time to be rtt */
+		est->mdev = m << 1;	/* make sure rto = 3*rtt */
+		est->rttvar = 0 ;
+		/* max(est->mdev, tcp_rto_min(sk)); */
+		est->mdev_max = est->rttvar;
+		est->rtt_seq = tp->snd_nxt;
+	}
+	est->delay = max(1U, delay);
+	/* minmax_running_min(&est->owd_min, wlen, tcp_time_stamp, mes_delay); */
+	
+	/* printk ("found a min of %u", US_TO_MS(minmax_get(&est->owd_min))); */
+	/* tcp_owd_ms("returned estimation", tp, est->delay); */
+	/* printk("returned estimation = %u us, srcaddr = %x  (shared precision %d)", */ 
+	/* 		est->delay, */
+	/* 		((struct sock *) tp) -> __sk_common.skc_rcv_saddr, */
+	/* 		tp->tsext_precision */
+	/* ); */
 }
 
 /* Called to compute a smoothed rtt estimate. The data fed to this
@@ -2952,6 +3075,8 @@ static bool tcp_ack_update_rtt(struct sock *sk, const int flag,
 	 * See draft-ietf-tcplw-high-performance-00, section 3.3.
 	 */
 	if (seq_rtt_us < 0 && tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr &&
+		/* should be ok to ignore */
+		!tp->rx_opt.tstamp_extended &&
 	    flag & FLAG_ACKED) {
 		u32 delta = tcp_time_stamp(tp) - tp->rx_opt.rcv_tsecr;
 		u32 delta_us = delta * (USEC_PER_SEC / TCP_TS_HZ);
@@ -3481,9 +3606,64 @@ static void tcp_send_challenge_ack(struct sock *sk, const struct sk_buff *skb)
 	}
 }
 
+/* the ts_recent stuff might break with extended ts
+ * store the last seen timestamp 
+ * this is used in established mode only
+ */
 static void tcp_store_ts_recent(struct tcp_sock *tp)
 {
+	/* In extended mode, the ts_recent value is changed to the forward OWD
+	 * also updates
+	 */
+
+	/* TODO comparer avec l'original */
 	tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
+
+	/* printk ("tcp_store_recent\n"); */
+	if (tp->rx_opt.tstamp_extended) {
+		/* printk ("Storing recent value");
+		 * computes OWD, updates the value too
+		 */
+
+		u32 wlen = sysctl_tcp_min_rtt_wlen * HZ;
+		/* lui il renvoie un u64 */
+		u32 now = tcp_time_stamp_extended(tp->tsext_precision);
+		u32 owd_in = 0, owd_out = 0;
+		if (now <=  tp->rx_opt.rcv_tsval) {
+			pr_warn("%s: ignore measurement, one of the ts counter has wrapped now=%u received tsval=%u (would result in %u)", 
+					__func__, now, tp->rx_opt.rcv_tsval,
+					now - tp->rx_opt.rcv_tsval
+			);
+			return;
+		}
+		tp->rx_opt.ts_recent = now - tp->rx_opt.rcv_tsval;
+
+		owd_in = tcp_convert_peer_ts(tp->tsext_precision, tp->rx_opt.ts_recent);
+
+		/* too verbose */
+		printk("%s: storing ts_recent: %u = current time (%u) - tsval (%u), srcaddr = %x\n", 
+			__func__, tp->rx_opt.ts_recent, now, tp->rx_opt.rcv_tsval, ((struct sock *) tp)->__sk_common.skc_rcv_saddr);
+		/* 	 TODO should we do it here or later ?*/
+		printk("OWD: estimate owd_in with ts_recent = %u (%u us)\n", tp->rx_opt.ts_recent, owd_in);
+	  	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);
+		minmax_running_min(&tp->owd_in.owd_min, wlen, tcp_time_stamp, owd_in);
+		printk("OWD: current estimations sowd = %llu us and min %u\n", tp->owd_in.delay, minmax_get(&tp->owd_in.owd_min));
+
+		/* check it 's not 0 */
+		owd_out =  tcp_convert_peer_ts(tp->tsext_precision, tp->rx_opt.rcv_tsecr);
+		printk("OWD: estimate ts with raw ecr = %u (%u us)\n", tp->rx_opt.rcv_tsecr, owd_out);
+		tcp_owd_estimator(tp, &tp->owd_out, owd_out);
+		minmax_running_min(&tp->owd_out.owd_min, wlen, tcp_time_stamp, owd_out);
+		/* tcp_owd_ms("estimated OWD", tp, tp->owd_out.delay); */
+
+		/* printk("estimated OWD = %u, srcaddr = %x\n", tp->owd_out.delay >> 3, ((struct sock *) tp) -> __sk_common.skc_rcv_saddr); */		
+
+
+	} else {
+		printk("non-extended: storing ts_recent %u\n", tp->rx_opt.rcv_tsval);
+		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
+	}
+
 	tp->rx_opt.ts_recent_stamp = get_seconds();
 }
 
@@ -3497,6 +3677,8 @@ static void tcp_replace_ts_recent(struct tcp_sock *tp, u32 seq)
 		 * Not only, also it occurs for expired timestamps.
 		 */
 
+		/* TODO ignore when in extended mode ? 
+		 * or run some other checks */ 
 		if (tcp_paws_check(&tp->rx_opt, 0))
 			tcp_store_ts_recent(tp);
 	}
@@ -5346,6 +5528,8 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 	    tp->rx_opt.saw_tstamp &&
 	    tcp_paws_discard(sk, skb)) {
 		if (!th->rst) {
+
+			printk ("%s: PAWS reject", __func__);
 			NET_INC_STATS(sock_net(sk), LINUX_MIB_PAWSESTABREJECTED);
 			if (!tcp_oow_rate_limited(sock_net(sk), skb,
 						  LINUX_MIB_TCPACKSKIPPEDPAWS,
@@ -5528,7 +5712,8 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 				goto slow_path;
 
 			/* If PAWS failed, check it more carefully in slow path */
-			if ((s32)(tp->rx_opt.rcv_tsval - tp->rx_opt.ts_recent) < 0)
+			if ((s32)(tp->rx_opt.rcv_tsval - tp->rx_opt.ts_recent) < 0
+				&& !tp->rx_opt.tstamp_extended)
 				goto slow_path;
 
 			/* DO NOT update ts_recent here, if checksum fails
@@ -5760,8 +5945,71 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 	tcp_parse_options(sock_net(sk), skb, &tp->rx_opt,
 			  mptcp(tp) ? &tp->mptcp->rx_opt : &mopt, 0, &foc, tp);
-	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr)
+	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr) {
+
+		/* if extended mode, need to retrieve peer capabilities before the offset */
+		if (sysctl_tcp_timestamps > 2) {
+			pr_info ("%s: checking extended ts support, ", __func__);
+			if (tp->rx_opt.rcv_tsecr == tp->retrans_stamp) {
+				pr_info ("%s: peer doesn't support extended ts, it echoed back %u", __func__, tp->rx_opt.rcv_tsecr);
+			} else {
+				/* check_tcp_syn_cookie */
+				/* TODO remove we hijacked rcp_stamp to save our syn tsval */
+
+				/* trying to retrieve peer tsecr by removing our potential tsval mask */
+				u32 tsecr = tp->rx_opt.rcv_tsecr ^ tp->retrans_stamp;
+				/* tp->rx_opt.rcv_tsecr ^= tp->retrans_stamp; */
+				mptcp_debug ("%s: tsecr=%u after xoring with recent_tstamp %u", __func__, 
+						tsecr, tp->retrans_stamp);
+
+
+				/* be careful if remote host has syncookie enabled it can answer with some data 
+				 * if no higher bits are all 0 than it should be a syncookie answer (to check)*/
+				if ((TCP_TSEXT_EXO_MASK & tsecr) == 0) {
+					pr_warn ("%u looks like a syncookie timestamp !!", tsecr);
+				}
+				else {
+					/* this is a valid TSext option */
+					u32 requested_precision = 0;
+					tp->rx_opt.rcv_tsecr = tsecr;
+
+					// la valeur binaire la elle est parfaite
+					pr_info ("%s: version bits: %u", __func__, (TCP_TSEXT_VERSION_MASK & tsecr) >> 29);
+					tp->rx_opt.tstamp_extended = ((TCP_TSEXT_VERSION_MASK & tsecr) >> 29 ) + 1;
+
+					/* take max with our own precision */
+					requested_precision = tp->rx_opt.rcv_tsecr & 0x00ffffff;
+
+					if (requested_precision > TCP_TSEXT_PRECISION_MAX) {
+						pr_warn ("Precision %u is UNSUPPORTED !", tp->tsext_precision);
+					} else {
+						/* choose the minimum precision supported by both hosts */
+						tp->tsext_precision = min(requested_precision, tp->tsext_precision);
+					}
+					/* TODO validate tsext_precision */ 
+					/* Save the precision  ? */
+					mptcp_debug ("%s: peer supports extended ts version=%u with precision %u."
+							"(initial syn.tsval=tp->retrans_stamp=%u tp->rx_opt.rcv_tsecr=%u",
+						__func__,
+						tp->rx_opt.tstamp_extended,
+						tp->tsext_precision,
+						tp->retrans_stamp,
+						tp->rx_opt.rcv_tsecr
+					);
+
+					/* tp->rx_opt.rcv_tsecr */
+					/* restore the expected value by PAWS a few lines below
+					* hum why ? c la qu'il sauvegarde un 0 */
+					tp->rx_opt.rcv_tsecr = tp->retrans_stamp;
+				}
+
+				/* tp->rx_opt.rcv_tsecr = tp->retrans_stamp; */
+			}
+		} 
+
+		/* unconditionally substract tsoffset sine it is 0 when offeset disabled */
 		tp->rx_opt.rcv_tsecr -= tp->tsoffset;
+	}
 
 	if (th->ack) {
 		/* rfc793:
@@ -5777,8 +6025,12 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			goto reset_and_undo;
 
 		if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr &&
+			/* with extended this breaks the connection ? we might want to find a better fix later */
+			!tp->rx_opt.tstamp_extended &&
 		    !between(tp->rx_opt.rcv_tsecr, tp->retrans_stamp,
-			     tcp_time_stamp(tp))) {
+			     tcp_time_stamp)
+			) {
+			pr_warn ("%s: killing connection because of PAWS %u", __func__, tp->retrans_stamp);
 			NET_INC_STATS(sock_net(sk),
 					LINUX_MIB_PAWSACTIVEREJECTED);
 			goto reset_and_undo;
@@ -6408,6 +6660,20 @@ static void tcp_openreq_init(struct request_sock *req,
 	ireq->ir_rmt_port = tcp_hdr(skb)->source;
 	ireq->ir_num = ntohs(tcp_hdr(skb)->dest);
 	ireq->ir_mark = inet_request_mark(sk, skb);
+	/* 1/ check timestamps are enabled
+	 * 2/ retrieve the version number
+	 */
+    ireq->tstamp_extended = (rx_opt->tstamp_ok && (rx_opt->rcv_tsecr & TCP_TSEXT_EXO_MASK))
+		/* + 1 so that it's not 0 even when version is 0 */
+		? ((rx_opt->rcv_tsecr & 0x6f000000) >> 29) + 1 : 0;
+	ireq->tsext_precision = 0x00ffffff & rx_opt->rcv_tsecr;
+    mptcp_debug ("Client requested a precision of %d (%d=>ms %d=>us)", ireq->tsext_precision,
+			TCP_TSEXT_PRECISION_MS, TCP_TSEXT_PRECISION_US);
+
+	/* choose the lowest common precision */
+	ireq->tsext_precision =	min(ireq->tsext_precision, (u32)sysctl_tcp_timestamps_precision);
+    mptcp_debug ("ts_extended version=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u client precision=%uns",
+			ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent, ireq->tsext_precision);
 }
 
 struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,
@@ -6534,6 +6800,8 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 		tcp_clear_options(&tmp_opt);
 
 	tmp_opt.tstamp_ok = tmp_opt.saw_tstamp;
+	pr_info("%s: tmp_opt.tstamp_ok=%d after parsing options tsecr: %u",
+			__func__, tmp_opt.tstamp_ok, tmp_opt.rcv_tsecr);
 	tcp_openreq_init(req, &tmp_opt, skb, sk);
 	inet_rsk(req)->no_srccheck = inet_sk(sk)->transparent;
 

@@ -265,6 +265,8 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 #define FLAG_FORWARD_PROGRESS	(FLAG_ACKED|FLAG_DATA_SACKED)
 
 /* sysctl variables for tcp */
+extern int sysctl_tcp_timestamps_precision;
+extern int sysctl_tcp_timestamps;
 extern int sysctl_tcp_fastopen;
 extern int sysctl_tcp_retrans_collapse;
 extern int sysctl_tcp_stdurg;
@@ -838,6 +840,93 @@ void tcp_send_window_probe(struct sock *sk);
  * historically has been the same until linux-4.13.
  */
 #define tcp_jiffies32 ((u32)jiffies)
+#define tcp_time_stamp_extended(x)		((__u32)(tcp_time_stamp_extended_func( (x) )))
+
+
+/* when using tcp timestamp extended 
+ * 
+ */ 
+/* #define TCP_TS_PRECISION 1 */
+
+#define TCP_TSEXT_PRECISION_MS 1
+#define TCP_TSEXT_PRECISION_US 2
+#define TCP_TSEXT_PRECISION_NS 3
+#define TCP_TSEXT_PRECISION_MAX 2
+
+#define US_TO_MS(ns)	DIV_ROUND_UP(ns, 1000L)
+
+/* u64 tcp_convert_peer_ts(u32 precision, u32 ts); */
+/* u64 tcp_convert_local_ts(u32 precision, u32 ts); */
+
+/* print OWD as string */ 
+static inline void tcp_owd_ms (const char* prefix, const struct tcp_sock *tp, u32 delay_us) {
+
+	/* ktime_t t; */
+	/* u64 ts = delay; */
+	
+	switch(tp->tsext_precision) {
+		/* case TCP_TSEXT_PRECISION_MS: */
+		/* 	t = ms_to_ktime(ts); break; */
+		/* case TCP_TSEXT_PRECISION_US: */
+		/* 	t = ns_to_ktime(ts*1000); break; */
+		/* case TCP_TSEXT_PRECISION_NS: */
+			/* result = ktime_to_us(t); break; */
+			/* break; */
+		case 0:
+			/* return "(jiffies)" */
+		default:
+			pr_err("Wrong precision %u", tp->tsext_precision);
+	};
+
+	
+	/* always display (raw value) */
+	printk("%s: Delay=%lu ms (raw value %u, tp->precision=%u)", prefix,
+		US_TO_MS(delay_us), delay_us, tp->tsext_precision
+	);
+
+}
+
+/* Look into include/linux/timekeeping.h to retreive time
+* then use include/linux/ktime.h
+* http://www.fieldses.org/~bfields/kernel/time.txt
+* Use tai time so that it is consistent across computers
+* TODO make it precision dependant tsext_precision
+* WARN ignore precision for now
+*/
+static inline u64 tcp_time_stamp_extended_func (u32 precision) {
+	/* Look into include/linux/timekeeping.h to retreive time
+	 * then use include/linux/ktime.h
+	 * http://www.fieldses.org/~bfields/kernel/time.txt
+	 * Use tai time so that it is consistent across computers
+	 * TODO make it precision dependant tsext_precision
+	 */
+
+	 /* long long int nsTime = ktime_to_ns(ktime_get()); */
+	/* I could use straight ktime_get_tai_ns */
+	ktime_t t = ktime_get_clocktai();
+
+	/* ktime_to_us */
+	/* u32 precision = TCP_TS_PRECISION; */
+	/* u32 precision = tp->tsext_precision; */
+	s64 result = -42;
+
+	/* tcp_ts_interval(); */
+	switch(precision) {
+		case TCP_TSEXT_PRECISION_MS:
+		 result = ktime_to_ms(t); break;
+		case TCP_TSEXT_PRECISION_US:
+		 result = ktime_to_us(t); break;
+		case 0:
+			result = (s64)tcp_time_stamp; break;
+		default:
+			pr_err("Wrong precision %d", precision);
+	};
+
+	/* if clocks are in sync we can drop MSB */
+	if (result < 0)
+		pr_err("ts %lld < 0 !!!", result);
+	return (u64)result;
+}
 
 /*
  * Deliver a 32bit value for TCP timestamp option (RFC 7323)
@@ -1552,6 +1641,12 @@ static inline int tcp_fin_time(const struct sock *sk)
 static inline bool tcp_paws_check(const struct tcp_options_received *rx_opt,
 				  int paws_win)
 {
+	if (rx_opt->tstamp_extended) {
+		/* as a temporary measure 
+		 * todo should compare value with RTT and measured owd, to detect changes
+		 * */
+		return true;
+	}
 	if ((s32)(rx_opt->ts_recent - rx_opt->rcv_tsval) <= paws_win)
 		return true;
 	if (unlikely(get_seconds() >= rx_opt->ts_recent_stamp + TCP_PAWS_24DAYS))
@@ -1563,6 +1658,8 @@ static inline bool tcp_paws_check(const struct tcp_options_received *rx_opt,
 	 */
 	if (!rx_opt->ts_recent)
 		return true;
+
+	pr_warn("%s: PAWS failure ts_recent %u !! ", __func__, rx_opt->ts_recent);
 	return false;
 }
 
@@ -2296,4 +2393,14 @@ static inline bool tcp_bpf_ca_needs_ecn(struct sock *sk)
 {
 	return (tcp_call_bpf(sk, BPF_SOCK_OPS_NEEDS_ECN) == 1);
 }
+
+
+/* only print if enabled
+ * prepend precision ? */
+#define owd_debug(tp, fmt, args...) do { \
+	if ( tp->rx_opt.tstamp_extended ) \
+		pr_err(__FILE__ ": " fmt, ##args);	\
+} while (0)
+
+
 #endif	/* _TCP_H */

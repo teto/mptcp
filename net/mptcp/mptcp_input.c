@@ -44,6 +44,9 @@ static inline bool before64(const u64 seq1, const u64 seq2)
 /* is seq1 > seq2 ? */
 #define after64(seq1, seq2)	before64(seq2, seq1)
 
+/* forward declaration */
+void mptcp_send_ack_on_fast_path(struct sock *sk);
+
 static inline void mptcp_become_fully_estab(struct sock *sk)
 {
 	tcp_sk(sk)->mptcp->fully_established = 1;
@@ -88,6 +91,91 @@ static inline int mptcp_tso_acked_reinject(const struct sock *meta_sk,
 
 	return packets_acked;
 }
+
+bool has_exactly_one_bit_set(__u32 flags)
+{
+	int i;
+	for (i = 0 ; i < 32 ; i++) {
+		if (flags == 1 << i)
+			return true;
+	}
+	return false;
+}
+
+void maybe_trigger_data_dupack(struct sock *meta_sk, struct sk_buff *skb)
+{
+	struct sock *sk;
+	struct tcp_sock *tp;
+	/* this is valid for outgoing frames ? */
+	__u32 mask = TCP_SKB_CB(skb)->path_mask;
+	/* printk("DEBUG_AGGRESSIVE: maybe trigger dupack"); */
+	/* if it was sent on several paths then we can't know anything yet */
+	if (!sysctl_mptcp_aggressive_dupack || !has_exactly_one_bit_set(mask))
+		return;
+	printk("DEBUG_AGGRESSIVE: really trigger dupack");
+
+	/* TODO map the dack to its ack  */
+	/* meta_tp->snd_una; */
+	mptcp_for_each_sk(tcp_sk(meta_sk)->mpcb, sk) {
+		struct inet_connection_sock *icsk = inet_csk(sk);
+		tp = tcp_sk(sk);
+	
+        printk("DEBUG_AGGRESSIVE: mask is %x, path index is %x", mask, tp->mptcp->path_index);
+		// ignore the dupack if we now that it is a reordering: not enough time has passed to receive an ack of the data
+		if (tp->mptcp->path_index >= 32 || 
+			get_virtual_rtt_us(tp) >= tcp_time_stamp_extended(TCP_TSEXT_PRECISION_MS) - jiffies_to_usecs(tcp_skb_timestamp(skb))) 
+			continue;  // the mask is 32 bits long
+
+		/* there is another function to do that */
+		/* mptcp_pi_to_flag */
+		if (mask & mptcp_pi_to_flag(tp->mptcp->path_index)) {
+			//check if it can be possible that the dupack is from this path
+			//trigger data dupack if needed
+			// we first assume that it is always needed
+			++(tp->mptcp_data_sacked_out);
+			
+			if (tp->mptcp_data_sacked_out > tp->reordering) {
+				printk("DEBUG_AGGRESSIVE: AGGRESSIVE FAST RETRANSMIT, isreno = %d", tcp_is_reno(tp));
+				switch (icsk->icsk_ca_state) {
+					case TCP_CA_Recovery:
+						if (tcp_is_reno(tp)) {
+							printk ("DEBUG: RECOVERY setting mptcp_data_sacked_out to 0.");
+							tp->mptcp_data_sacked_out = 0;
+						}
+						break;
+
+					default:	
+						printk ("DEBUG: Resetting FAST_ ");
+
+				}
+				tcp_xmit_retransmit_queue(sk);
+				
+			}
+			/* tp->sacked_out, */ 
+			printk("DEBUG_AGGRESSIVE: subflow->tcp_sacked_out %d vs subflow->mptcp_data_sacked_out: %d", tp->sacked_out, tp->mptcp_data_sacked_out);
+			
+		}
+		
+	}
+}
+
+void maybe_reset_data_dupack(struct sock *meta_sk, struct sk_buff *skb) {
+	struct sock *sk;
+	struct tcp_sock *tp;
+	__u32 mask = TCP_SKB_CB(skb) -> path_mask;
+	if (!sysctl_mptcp_aggressive_dupack)
+		return;
+	mptcp_for_each_sk(tcp_sk(meta_sk)->mpcb, sk) {
+		tp = tcp_sk(sk);
+		if (tp->mptcp->path_index >= 32)
+			continue;  // the mask is 32 bits long
+		if (mask & (1 << (tp->mptcp->path_index-1))) {
+			tp->mptcp_data_sacked_out = 0;
+		}
+	}
+}
+
+
 
 /**
  * Cleans the meta-socket retransmission queue and the reinject-queue.
@@ -1019,6 +1107,9 @@ static int mptcp_queue_skb(struct sock *sk)
 				kfree_skb_partial(tmp1, fragstolen);
 
 			data_queued = true;
+
+			/* Experimental addition */
+			mptcp_send_ack_on_fast_path(sk);
 next:
 			if (!skb_queue_empty(&sk->sk_receive_queue) &&
 			    !before(TCP_SKB_CB(tmp)->seq,
@@ -1509,10 +1600,18 @@ static void mptcp_data_ack(struct sock *sk, const struct sk_buff *skb)
 	 */
 	sk->sk_err_soft = 0;
 	inet_csk(meta_sk)->icsk_probes_out = 0;
+	/* owd93 has: meta_tp->rcv_tstamp = tcp_time_stamp; */
 	meta_tp->rcv_tstamp = tcp_jiffies32;
 	prior_packets = meta_tp->packets_out;
 	if (!prior_packets)
 		goto no_queue;
+
+	if (data_ack == prior_snd_una) {
+		// the maybe lost skb is at the head of the write queue
+		maybe_trigger_data_dupack(meta_sk, tcp_write_queue_head(meta_sk));
+	} else {
+		maybe_reset_data_dupack(meta_sk, tcp_write_queue_head(meta_sk));
+	}
 
 	mptcp_snd_una_update(meta_tp, data_ack);
 
@@ -1582,6 +1681,8 @@ static void mptcp_send_reset_rem_id(const struct mptcp_cb *mpcb, u8 rem_id)
 
 	mptcp_for_each_sk_safe(mpcb, sk_it, tmpsk) {
 		if (tcp_sk(sk_it)->mptcp->rem_id == rem_id) {
+
+			pr_info ("reinject because of rem_id");
 			mptcp_reinject_data(sk_it, 0);
 			mptcp_send_reset(sk_it);
 		}
@@ -2111,6 +2212,37 @@ static inline void mptcp_path_array_check(struct sock *meta_sk)
 	}
 }
 
+
+
+void mptcp_update_min_owds(const struct sock *meta_sk)
+{
+	struct tcp_sock *meta_tp = tcp_sk(meta_sk);
+	struct mptcp_cb *mpcb = meta_tp->mpcb;
+
+	struct sock *sk_it, *sk_tmp;
+
+	u32 min_in  = 0xFFFFFFFF;
+	u32 min_out = 0xFFFFFFFF;
+
+
+	mptcp_for_each_sk_safe(mpcb, sk_it, sk_tmp) {
+			struct tcp_sock *tp_it = tcp_sk(sk_it);
+			if (tp_it->owd_in.delay < min_in) {
+					min_in = tp_it->owd_in.delay ? tp_it->owd_in.delay : tp_it->srtt_us;
+			}
+			if (tp_it -> owd_out.delay < min_out) {
+					min_out = tp_it->owd_out.delay ? tp_it->owd_out.delay : tp_it->srtt_us;
+			}
+
+	}
+
+	meta_tp->mptcp_min_path_owd_in  = min_in;
+	meta_tp->mptcp_min_path_owd_out = min_out;
+
+}
+
+
+
 bool mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 			  const struct sk_buff *skb)
 {
@@ -2175,6 +2307,8 @@ bool mptcp_handle_options(struct sock *sk, const struct tcphdr *th,
 		}
 		mopt->saw_low_prio = 0;
 	}
+
+	mptcp_update_min_owds(mptcp_meta_sk(sk));
 
 	mptcp_data_ack(sk, skb);
 
@@ -2423,6 +2557,7 @@ void mptcp_init_buffer_space(struct sock *sk)
 
 	if (is_master_tp(tp)) {
 		meta_tp->rcvq_space.space = meta_tp->rcv_wnd;
+		/* used to be meta_tp->rcvq_space.time = tcp_time_stamp; */
 		tcp_mstamp_refresh(meta_tp);
 		meta_tp->rcvq_space.time = meta_tp->tcp_mstamp;
 		meta_tp->rcvq_space.seq = meta_tp->copied_seq;
