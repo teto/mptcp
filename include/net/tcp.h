@@ -917,7 +917,7 @@ static inline u64 tcp_time_stamp_extended_func (u32 precision) {
 		case TCP_TSEXT_PRECISION_US:
 		 result = ktime_to_us(t); break;
 		case 0:
-			result = (s64)tcp_time_stamp; break;
+			result = (s64)tcp_jiffies32; break;
 		default:
 			pr_err("Wrong precision %d", precision);
 	};

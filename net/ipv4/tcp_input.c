@@ -191,6 +191,8 @@ static void tcp_incr_quickack(struct sock *sk, unsigned int max_quickacks)
 	quickacks = min(quickacks, max_quickacks);
 	if (quickacks > icsk->icsk_ack.quick)
 		icsk->icsk_ack.quick = quickacks;
+}
+
 
 /* convert ts from peer (negotiated) precision to 
  * local precision which is assumed to be US
@@ -776,7 +778,7 @@ static void tcp_owd_estimator(struct tcp_sock *tp, struct tcp_delay_est* est, lo
 	/* struct tcp_sock *tp = tcp_sk(sk); */
 	long m = mes_delay; /* owd */
 	u32 delay = est->delay; /* rename to smooth delay */
-	u32 wlen = sysctl_tcp_min_rtt_wlen * HZ;
+	/* u32 wlen = sysctl_tcp_min_rtt_wlen * HZ; */
 
 	/* if (tp->tsext_precision != TCP_TSEXT_PRECISION_US) { */
 	/* } */
@@ -3646,14 +3648,14 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 		/* 	 TODO should we do it here or later ?*/
 		printk("OWD: estimate owd_in with ts_recent = %u (%u us)\n", tp->rx_opt.ts_recent, owd_in);
 	  	tcp_owd_estimator(tp, &tp->owd_in, tp->rx_opt.ts_recent);
-		minmax_running_min(&tp->owd_in.owd_min, wlen, tcp_time_stamp, owd_in);
+		minmax_running_min(&tp->owd_in.owd_min, wlen, tcp_jiffies32, owd_in);
 		printk("OWD: current estimations sowd = %llu us and min %u\n", tp->owd_in.delay, minmax_get(&tp->owd_in.owd_min));
 
 		/* check it 's not 0 */
 		owd_out =  tcp_convert_peer_ts(tp->tsext_precision, tp->rx_opt.rcv_tsecr);
 		printk("OWD: estimate ts with raw ecr = %u (%u us)\n", tp->rx_opt.rcv_tsecr, owd_out);
 		tcp_owd_estimator(tp, &tp->owd_out, owd_out);
-		minmax_running_min(&tp->owd_out.owd_min, wlen, tcp_time_stamp, owd_out);
+		minmax_running_min(&tp->owd_out.owd_min, wlen, tcp_jiffies32, owd_out);
 		/* tcp_owd_ms("estimated OWD", tp, tp->owd_out.delay); */
 
 		/* printk("estimated OWD = %u, srcaddr = %x\n", tp->owd_out.delay >> 3, ((struct sock *) tp) -> __sk_common.skc_rcv_saddr); */		
@@ -6028,7 +6030,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			/* with extended this breaks the connection ? we might want to find a better fix later */
 			!tp->rx_opt.tstamp_extended &&
 		    !between(tp->rx_opt.rcv_tsecr, tp->retrans_stamp,
-			     tcp_time_stamp)
+		     tcp_time_stamp(tp))
 			) {
 			pr_warn ("%s: killing connection because of PAWS %u", __func__, tp->retrans_stamp);
 			NET_INC_STATS(sock_net(sk),
