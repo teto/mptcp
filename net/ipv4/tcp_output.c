@@ -127,12 +127,12 @@ static inline u32 tcp_ts_interval (void)
 }
 
 
-static inline __u32 tcp_timestamp_extended_option(u32 precision)
+static inline __u32 tcp_timestamp_extended_option(int timestamp_value, u32 precision)
 {
 	/* version on 2 bits 
 	 * value wallclock => 1
 	 */
-	return TCP_TSEXT_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x00ffffff & precision);
+	return TCP_TSEXT_EXO_MASK |  ( (timestamp_value == 4) << 29) | (0x00ffffff & precision);
 }
 
 /* Calculate mss to advertise in SYN segment.
@@ -584,6 +584,7 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 	struct tcp_sock *tp = tcp_sk(sk);
 	unsigned int remaining = MAX_TCP_OPTION_SPACE;
 	struct tcp_fastopen_request *fastopen = tp->fastopen_req;
+	int tcp_timestamps = sock_net(sk)->ipv4.sysctl_tcp_timestamps;
 
 #ifdef CONFIG_TCP_MD5SIG
 	*md5 = tp->af_specific->md5_lookup(sk, sk);
@@ -607,13 +608,13 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 	opts->mss = tcp_advertise_mss(sk);
 	remaining -= TCPOLEN_MSS_ALIGNED;
 
-	if (likely(sock_net(sk)->ipv4.sysctl_tcp_timestamps && !*md5)) {
+	if (likely(tcp_timestamps && !*md5)) {
 		opts->options |= OPTION_TS;
 		opts->tsval = tcp_skb_timestamp(skb) + tp->tsoffset;
 		opts->tsecr = tp->rx_opt.ts_recent;
 
 		/* todo replace */
-		if (sysctl_tcp_timestamps > 2) {
+		if (tcp_timestamps > 2) {
 			/* we set the EXO = extended option (1 bit) */
 			WARN(opts->tsecr != 0, "tsecr should not be null");
 			// write an inline function
@@ -622,7 +623,7 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 			tp->tsext_precision = sysctl_tcp_timestamps_precision;
 			pr_info ("ts_extended=> socket setup with precision %u", tp->tsext_precision);
 			opts->tsval = tcp_time_stamp_extended(tp->tsext_precision);
-			opts->tsecr = tcp_timestamp_extended_option(tp->tsext_precision);
+			opts->tsecr = tcp_timestamp_extended_option(tcp_timestamps, tp->tsext_precision);
 			tp->retrans_stamp = opts->tsval;
 				/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
 			 * look at retrans_stamp instead */
@@ -701,14 +702,17 @@ static unsigned int tcp_synack_options(struct request_sock *req,
 		remaining -= TCPOLEN_WSCALE_ALIGNED;
 	}
 	if (likely(ireq->tstamp_ok)) {
+		struct net *net = read_pnet(&ireq->ireq_net);
 		opts->options |= OPTION_TS;
 		opts->tsval = tcp_skb_timestamp(skb) + tcp_rsk(req)->ts_off;
 		opts->tsecr = req->ts_recent;
 
-		if (ireq->tstamp_extended && sysctl_tcp_timestamps > 2) {
+		if (ireq->tstamp_extended && net->ipv4.sysctl_tcp_timestamps > 2) {
 			/* return sender tsval XOR our config. */
 			opts->tsval = tcp_time_stamp_extended(ireq->tsext_precision);
-			opts->tsecr = req->ts_recent ^ tcp_timestamp_extended_option(ireq->tsext_precision);
+			opts->tsecr = req->ts_recent ^ tcp_timestamp_extended_option(
+				net->ipv4.sysctl_tcp_timestamps,
+				ireq->tsext_precision);
 			mptcp_debug ("%s: extended ts, reusing syn tsval=%u, sending tsecr=%u (xoring option with syn.tsval %u)",
 					__func__, 
 					req->ts_recent,

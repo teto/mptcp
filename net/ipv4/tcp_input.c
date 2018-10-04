@@ -81,7 +81,6 @@
 #include <net/mptcp_v6.h>
 
 int sysctl_tcp_timestamps_precision __read_mostly = TCP_TSEXT_PRECISION_MS;
-int sysctl_tcp_timestamps __read_mostly = 1;
 int sysctl_tcp_fack __read_mostly;
 int sysctl_tcp_max_reordering __read_mostly = 300;
 int sysctl_tcp_dsack __read_mostly = 1;
@@ -5950,7 +5949,8 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr) {
 
 		/* if extended mode, need to retrieve peer capabilities before the offset */
-		if (sysctl_tcp_timestamps > 2) {
+/* net->ipv4.sysctl_tcp_timestamps))) { */
+		if (sock_net(sk)->ipv4.sysctl_tcp_timestamps > 2) {
 			pr_info ("%s: checking extended ts support, ", __func__);
 			if (tp->rx_opt.rcv_tsecr == tp->retrans_stamp) {
 				pr_info ("%s: peer doesn't support extended ts, it echoed back %u", __func__, tp->rx_opt.rcv_tsecr);
@@ -5961,7 +5961,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 				/* trying to retrieve peer tsecr by removing our potential tsval mask */
 				u32 tsecr = tp->rx_opt.rcv_tsecr ^ tp->retrans_stamp;
 				/* tp->rx_opt.rcv_tsecr ^= tp->retrans_stamp; */
-				mptcp_debug ("%s: tsecr=%u after xoring with recent_tstamp %u", __func__, 
+				pr_info ("%s: tsecr=%u after xoring with recent_tstamp %u", __func__, 
 						tsecr, tp->retrans_stamp);
 
 
@@ -5990,7 +5990,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 					}
 					/* TODO validate tsext_precision */ 
 					/* Save the precision  ? */
-					mptcp_debug ("%s: peer supports extended ts version=%u with precision %u."
+					pr_info ("%s: peer supports extended ts version=%u with precision %u."
 							"(initial syn.tsval=tp->retrans_stamp=%u tp->rx_opt.rcv_tsecr=%u",
 						__func__,
 						tp->rx_opt.tstamp_extended,
@@ -6030,9 +6030,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			/* with extended this breaks the connection ? we might want to find a better fix later */
 			!tp->rx_opt.tstamp_extended &&
 		    !between(tp->rx_opt.rcv_tsecr, tp->retrans_stamp,
-		     tcp_time_stamp(tp))
-			) {
-			pr_warn ("%s: killing connection because of PAWS %u", __func__, tp->retrans_stamp);
+			     tcp_time_stamp(tp))) {
 			NET_INC_STATS(sock_net(sk),
 					LINUX_MIB_PAWSACTIVEREJECTED);
 			goto reset_and_undo;
@@ -6673,9 +6671,9 @@ static void tcp_openreq_init(struct request_sock *req,
 			TCP_TSEXT_PRECISION_MS, TCP_TSEXT_PRECISION_US);
 
 	/* choose the lowest common precision */
-	ireq->tsext_precision =	min(ireq->tsext_precision, (u32)sysctl_tcp_timestamps_precision);
-    mptcp_debug ("ts_extended version=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u client precision=%uns",
-			ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent, ireq->tsext_precision);
+	ireq->tsext_precision = min(ireq->tsext_precision, (u32)sysctl_tcp_timestamps_precision);
+	mptcp_debug ("ts_extended version=%d. rx_opt->rcv_tsecr=%u, stored ts_recent=%u client precision=%uns",
+		ireq->tstamp_extended, rx_opt->rcv_tsecr, req->ts_recent, ireq->tsext_precision);
 }
 
 struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,
