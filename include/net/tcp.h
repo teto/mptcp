@@ -917,6 +917,8 @@ static inline u64 tcp_time_stamp_extended_func (u32 precision) {
 		 result = ktime_to_us(t); break;
 		case 0:
 			result = (s64)tcp_jiffies32; break;
+
+			opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0;
 		default:
 			pr_err("Wrong precision %d", precision);
 	};

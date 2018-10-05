@@ -17,6 +17,10 @@ let
     # detect if modules are in used
     allowImportFromDerivation = true;
     # modDirVersion="4.14.70";
+
+    shellHook = ''
+      touch .scmversion
+    '';
   };
 
   # pkg = pkgs.mptcp-local.override( {
