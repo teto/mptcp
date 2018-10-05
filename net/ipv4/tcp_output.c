@@ -613,7 +613,6 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 		opts->tsval = tcp_skb_timestamp(skb) + tp->tsoffset;
 		opts->tsecr = tp->rx_opt.ts_recent;
 
-		/* todo replace */
 		if (tcp_timestamps > 2) {
 			/* we set the EXO = extended option (1 bit) */
 			WARN(opts->tsecr != 0, "tsecr should not be null");
@@ -779,18 +778,15 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 		/* we don't care if ts_extended is enabled or not, we need to prevent too big a jump
 		 * between unlikely(tp->rx_opt.tstamp_extended) 
 		 */
-
-		mptcp_debug("%s: a priori sending with precision %u", __func__, tp->tsext_precision);
-		opts->tsval = tcp_time_stamp_extended(tp->tsext_precision) + tp->tsoffset;
+		if(sock_net(sk)->ipv4.sysctl_tcp_timestamps > 2) {
+			printk ("%s: a priori sending with precision %u", __func__, tp->tsext_precision);
+			opts->tsval = tcp_time_stamp_extended(tp->tsext_precision) + tp->tsoffset;
+		}
 
 		/* In extended mode, the ts_recent value was already changed to the
 		 * forward OWD in tcp_store_ts_recent */
 		opts->tsecr = tp->rx_opt.ts_recent;
 		owd_debug(tp, "sending tsecr=%u", opts->tsecr);
-		/* mptcp_debug("%s: extended=%d a priori sending tsecr=%u", */
-		/* 		__func__, tp->rx_opt.tstamp_extended, */
-		/* 		opts->tsecr */
-		/* 	); */
 
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}

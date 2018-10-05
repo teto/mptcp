@@ -916,11 +916,12 @@ static inline u64 tcp_time_stamp_extended_func (u32 precision) {
 		case TCP_TSEXT_PRECISION_US:
 		 result = ktime_to_us(t); break;
 		case 0:
-			result = (s64)tcp_jiffies32; break;
+		 	/* this was valid in older */
+			/* result = (s64)tcp_jiffies32; break; */
 
-			opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0;
+			/* opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0; */
 		default:
-			pr_err("Wrong precision %d", precision);
+			pr_err("INVALID PRECISION %d", precision);
 	};
 
 	/* if clocks are in sync we can drop MSB */
@@ -2400,7 +2401,7 @@ static inline bool tcp_bpf_ca_needs_ecn(struct sock *sk)
  * prepend precision ? */
 #define owd_debug(tp, fmt, args...) do { \
 	if ( tp->rx_opt.tstamp_extended ) \
-		pr_err(__FILE__ ": " fmt, ##args);	\
+		pr_info(__FILE__ ": " fmt, ##args);	\
 } while (0)
 
 
