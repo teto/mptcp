@@ -9,16 +9,14 @@ let
 
   pkg = linuxManualConfig {
     inherit stdenv;
-    inherit (linux_mptcp_94) src;
-    version = "${linux_mptcp_94}-custom";
-    # version = "${linux_4_9.version}-custom";
+    inherit (linux_mptcp_94) src version modDirVersion;
+    # version = linux_mptcp_94.version;
 
     configfile = /home/teto/dotfiles/kernels/mptcp94.config;
     # we need this to true else the kernel can't parse the config and 
     # detect if modules are in used
     allowImportFromDerivation = true;
-    # TODO inherit it
-    # modDirVersion="4.9.87matt";
+    # modDirVersion="4.14.70";
   };
 
   # pkg = pkgs.mptcp-local.override( {

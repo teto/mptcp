@@ -3617,9 +3617,6 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 	 * also updates
 	 */
 
-	/* TODO comparer avec l'original */
-	tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
-
 	/* printk ("tcp_store_recent\n"); */
 	if (tp->rx_opt.tstamp_extended) {
 		/* printk ("Storing recent value");
@@ -5949,7 +5946,6 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr) {
 
 		/* if extended mode, need to retrieve peer capabilities before the offset */
-/* net->ipv4.sysctl_tcp_timestamps))) { */
 		if (sock_net(sk)->ipv4.sysctl_tcp_timestamps > 2) {
 			pr_info ("%s: checking extended ts support, ", __func__);
 			if (tp->rx_opt.rcv_tsecr == tp->retrans_stamp) {
@@ -6031,6 +6027,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			!tp->rx_opt.tstamp_extended &&
 		    !between(tp->rx_opt.rcv_tsecr, tp->retrans_stamp,
 			     tcp_time_stamp(tp))) {
+			pr_warn ("%s: killing connection because of PAWS %u", __func__, tp->retrans_stamp);
 			NET_INC_STATS(sock_net(sk),
 					LINUX_MIB_PAWSACTIVEREJECTED);
 			goto reset_and_undo;
@@ -6121,6 +6118,8 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			tp->tcp_header_len =
 				sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
 			tp->advmss	    -= TCPOLEN_TSTAMP_ALIGNED;
+			mptcp_debug("%s: this part was left untouched, tststamp_extended=%u", 
+					__func__, tp->rx_opt.tstamp_extended);
 			tcp_store_ts_recent(tp);
 		} else {
 			tp->tcp_header_len = sizeof(struct tcphdr);
