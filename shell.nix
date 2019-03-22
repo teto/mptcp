@@ -18,9 +18,9 @@ let
     allowImportFromDerivation = true;
     # modDirVersion="4.14.70";
 
-    shellHook = ''
-      touch .scmversion
-    '';
+    # shellHook = ''
+    #   touch .scmversion
+    # '';
   };
 
   # pkg = pkgs.mptcp-local.override( {
