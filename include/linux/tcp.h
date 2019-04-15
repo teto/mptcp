@@ -261,6 +261,7 @@ struct tcp_sock {
 	u32	snd_wnd;	/* The window we expect to receive	*/
 	u32	max_window;	/* Maximal window ever seen from peer	*/
 	u32	mss_cache;	/* Cached effective mss, not including SACKS */
+	u32 snd_cwnd_before_idle_restart; /* ECF specific */
 
 	u32	window_clamp;	/* Maximal window to advertise		*/
 	u32	rcv_ssthresh;	/* Current window clamp			*/

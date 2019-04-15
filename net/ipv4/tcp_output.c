@@ -160,6 +160,14 @@ static void tcp_event_data_sent(struct tcp_sock *tp,
 	 */
 	if ((u32)(now - icsk->icsk_ack.lrcvtime) < icsk->icsk_ack.ato)
 		icsk->icsk_ack.pingpong = 1;
+
+	/* Added via ECF */
+	if (sysctl_tcp_slow_start_after_idle &&
+		(!tp->packets_out && (s32)(now - tp->lsndtime) > icsk->icsk_rto)) {
+			tp->snd_cwnd_before_idle_restart=
+					max(tp->snd_cwnd_before_idle_restart, tp->snd_cwnd);
+			tcp_cwnd_restart(sk, __sk_dst_get(sk));
+	}
 }
 
 /* Account for an ACK we sent. */
