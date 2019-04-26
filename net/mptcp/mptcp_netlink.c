@@ -1104,6 +1104,55 @@ mptcp_nl_genl_conn_exists(struct sk_buff *skb, struct genl_info *info)
 	return 0;
 }
 
+/* Addition by me to clamp window to a specific value */
+static int
+mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
+{
+	struct sock	*meta_sk, *subsk;
+	struct mptcp_cb	*mpcb;
+	int		ret = 0;
+	u32		token;
+	u8		backup = 0;
+
+	if (!info->attrs[MPTCP_ATTR_TOKEN])
+		return -EINVAL;
+
+	token = nla_get_u32(info->attrs[MPTCP_ATTR_TOKEN]);
+	if (info->attrs[MPTCP_ATTR_BACKUP])
+		backup = nla_get_u8(info->attrs[MPTCP_ATTR_BACKUP]);
+
+	meta_sk = mptcp_hash_find(genl_info_net(info), token);
+	if (!meta_sk)
+		return -EINVAL;
+
+	mpcb = tcp_sk(meta_sk)->mpcb;
+
+	mutex_lock(&mpcb->mpcb_mutex);
+	lock_sock_nested(meta_sk, SINGLE_DEPTH_NESTING);
+
+	mptcp_debug ( "Clamp window was called !!" );
+
+	/* subsk = mptcp_nl_subsk_lookup(mpcb, info->attrs); */
+	/* if (subsk) { */
+	/* 	tcp_sk(subsk)->mptcp->send_mp_prio	= 1; */
+	/* 	tcp_sk(subsk)->mptcp->low_prio		= !!backup; */
+
+	/* 	local_bh_disable(); */
+	/* 	if (mptcp_sk_can_send_ack(subsk)) */
+	/* 		tcp_send_ack(subsk); */
+	/* 	else */
+	/* 		ret = -ENOTCONN; */
+	/* 	local_bh_enable(); */
+	/* } else { */
+	/* 	ret = -EINVAL; */
+	/* } */
+
+	release_sock(meta_sk);
+	mutex_unlock(&mpcb->mpcb_mutex);
+	sock_put(meta_sk);
+	return ret;
+}
+
 static int
 mptcp_nl_genl_priority(struct sk_buff *skb, struct genl_info *info)
 {
@@ -1206,6 +1255,12 @@ static struct genl_ops mptcp_genl_ops[] = {
 	{
 		.cmd	= MPTCP_CMD_EXIST,
 		.doit	= mptcp_nl_genl_conn_exists,
+		.policy = mptcp_nl_genl_policy,
+		.flags	= GENL_ADMIN_PERM,
+	},
+	{
+		.cmd	= MPTCP_CMD_SND_CLAMP_WINDOW,
+		.doit	= mptcp_nl_genl_clamp_window,
 		.policy = mptcp_nl_genl_policy,
 		.flags	= GENL_ADMIN_PERM,
 	},
