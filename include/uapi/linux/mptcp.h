@@ -39,6 +39,7 @@ enum {
 	MPTCP_ATTR_FLAGS,	/* u16 */
 	MPTCP_ATTR_TIMEOUT,	/* u32 */
 	MPTCP_ATTR_IF_IDX,	/* s32 */
+	MPTCP_ATTR_CWND,	/* u32 */
 
 	__MPTCP_ATTR_AFTER_LAST
 };
