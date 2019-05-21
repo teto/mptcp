@@ -75,6 +75,7 @@ static const struct nla_policy mptcp_nl_genl_policy[MPTCP_ATTR_MAX + 1] = {
 	[MPTCP_ATTR_BACKUP]	= { .type	= NLA_U8,	},
 	[MPTCP_ATTR_TIMEOUT]	= { .type	= NLA_U32,	},
 	[MPTCP_ATTR_IF_IDX]	= { .type	= NLA_S32,	},
+	[MPTCP_ATTR_CWND]	= { .type	= NLA_U32,	},
 };
 
 /* Defines the userspace PM filter on events. Set events are ignored. */
@@ -1117,6 +1118,8 @@ mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
 	if (!info->attrs[MPTCP_ATTR_TOKEN])
 		return -EINVAL;
 
+	mptcp_debug ( "Clamp window was called start !!" );
+
 	token = nla_get_u32(info->attrs[MPTCP_ATTR_TOKEN]);
 	if (info->attrs[MPTCP_ATTR_BACKUP])
 		backup = nla_get_u8(info->attrs[MPTCP_ATTR_BACKUP]);
@@ -1220,49 +1223,49 @@ static struct genl_ops mptcp_genl_ops[] = {
 		.cmd	= MPTCP_CMD_ANNOUNCE,
 		.doit	= mptcp_nl_genl_announce,
 		.policy = mptcp_nl_genl_policy,
-		.flags	= GENL_ADMIN_PERM,
+		.flags	= 0,
 	},
 	{
 		.cmd	= MPTCP_CMD_REMOVE,
 		.doit	= mptcp_nl_genl_remove,
 		.policy = mptcp_nl_genl_policy,
-		.flags	= GENL_ADMIN_PERM,
+		.flags	= 0,
 	},
 	{
 		.cmd	= MPTCP_CMD_SUB_CREATE,
 		.doit	= mptcp_nl_genl_create,
 		.policy = mptcp_nl_genl_policy,
-		.flags	= GENL_ADMIN_PERM,
+		.flags	= 0,
 	},
 	{
 		.cmd	= MPTCP_CMD_SUB_DESTROY,
 		.doit	= mptcp_nl_genl_destroy,
 		.policy = mptcp_nl_genl_policy,
-		.flags	= GENL_ADMIN_PERM,
+		.flags	= 0,
 	},
 	{
 		.cmd	= MPTCP_CMD_SUB_PRIORITY,
 		.doit	= mptcp_nl_genl_priority,
 		.policy = mptcp_nl_genl_policy,
-		.flags	= GENL_ADMIN_PERM,
+		.flags	= 0,
 	},
 	{
 		.cmd	= MPTCP_CMD_SET_FILTER,
 		.doit	= mptcp_nl_genl_set_filter,
 		.policy = mptcp_nl_genl_policy,
-		.flags	= GENL_ADMIN_PERM,
+		.flags	= 0,
 	},
 	{
 		.cmd	= MPTCP_CMD_EXIST,
 		.doit	= mptcp_nl_genl_conn_exists,
 		.policy = mptcp_nl_genl_policy,
-		.flags	= GENL_ADMIN_PERM,
+		.flags	= 0,
 	},
 	{
 		.cmd	= MPTCP_CMD_SND_CLAMP_WINDOW,
 		.doit	= mptcp_nl_genl_clamp_window,
 		.policy = mptcp_nl_genl_policy,
-		.flags	= GENL_ADMIN_PERM,
+		.flags	= 0,
 	},
 };
 
