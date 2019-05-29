@@ -81,6 +81,26 @@ static const struct nla_policy mptcp_nl_genl_policy[MPTCP_ATTR_MAX + 1] = {
 /* Defines the userspace PM filter on events. Set events are ignored. */
 static u16 mptcp_nl_event_filter;
 
+
+static void mptcp_dump_sf_info(struct mptcp_tcp_sock	*mptcp)
+{
+	struct sock *subsk = mptcp_to_sock(mptcp);
+	struct inet_sock *isk = inet_sk(subsk);
+
+	/* mpcb = tcp_sk(meta_sk)->mpcb; */
+	mptcp_debug(
+		/* "%s: token %#x pi %d" */
+		" src_addr:%pI4:%d dst_addr:%pI4:%d\n",
+			/* __func__ , */
+			/* mpcb->mptcp_loc_token, */
+			/* tp->mptcp->path_index, */
+			&isk->inet_saddr,
+			ntohs(isk->inet_sport),
+			&isk->inet_daddr,
+			ntohs(isk->inet_dport)
+	);
+}
+
 static inline struct mptcp_nl_priv *
 mptcp_nl_priv(const struct sock *meta_sk)
 {
@@ -720,12 +740,18 @@ mptcp_nl_genl_remove(struct sk_buff *skb, struct genl_info *info)
 	bool			found = false;
 
 	if (!info->attrs[MPTCP_ATTR_TOKEN] || !info->attrs[MPTCP_ATTR_LOC_ID])
+	{
+		mptcp_debug ( "%s: no  not find a connection with this token" , __func__);
 		return -EINVAL;
+	}
 
 	token	= nla_get_u32(info->attrs[MPTCP_ATTR_TOKEN]);
 	meta_sk = mptcp_hash_find(genl_info_net(info), token);
 	if (!meta_sk)
+	{
+		mptcp_debug ( "%s: Could not find a connection with this token", __func__ );
 		return -EINVAL;
+	}
 
 	mpcb	= tcp_sk(meta_sk)->mpcb;
 	priv	= mptcp_nl_priv(meta_sk);
@@ -788,11 +814,16 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 
 	if (!info->attrs[MPTCP_ATTR_TOKEN] || !info->attrs[MPTCP_ATTR_FAMILY] ||
 	    !info->attrs[MPTCP_ATTR_LOC_ID] || !info->attrs[MPTCP_ATTR_REM_ID])
+	{
+
+		mptcp_debug ( "%s: Missing attribute", __func__ );
 		return -EINVAL;
+	}
 
 	token	= nla_get_u32(info->attrs[MPTCP_ATTR_TOKEN]);
 	meta_sk = mptcp_hash_find(genl_info_net(info), token);
 	if (!meta_sk)
+	{
 		/* We use a more specific value than EINVAL here so that
 		 * userspace can handle this specific case easily. This is
 		 * useful to check the case in which userspace tries to create a
@@ -803,7 +834,10 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 		 * through Netlink. It can easily happen for short life-time
 		 * conns.
 		 */
+		mptcp_debug ( "%s: MATT can't find token %u", __func__, token);
 		return -EBADR;
+	}
+	mptcp_debug ( "%s: MATT token %u found", __func__, token);
 
 	mpcb = tcp_sk(meta_sk)->mpcb;
 
@@ -816,6 +850,7 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 		 * invalid token possibility)
 		 */
 		ret = -EOWNERDEAD;
+		mptcp_debug ( "%s: owner dead", __func__ );
 		goto unlock;
 	}
 
@@ -825,6 +860,7 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 		 * create new subflows.
 		 */
 		ret = -ENOTCONN;
+		mptcp_debug ( "%s: no longer possible to create subflows", __func__ );
 		goto unlock;
 	}
 
@@ -835,6 +871,7 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 		 * EOWNERDEAD
 		 */
 		ret = -EAGAIN;
+		mptcp_debug ( "%s: not fully established yet", __func__ );
 		goto unlock;
 	}
 
@@ -851,6 +888,8 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 	if_idx = info->attrs[MPTCP_ATTR_IF_IDX]
 		 ? nla_get_s32(info->attrs[MPTCP_ATTR_IF_IDX]) : 0;
 
+	mptcp_debug ( "%s: if_idx set to %u", __func__, if_idx );
+
 	switch (family) {
 	case AF_INET: {
 		struct mptcp_rem4	rem = {
@@ -862,6 +901,7 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 
 		if (!info->attrs[MPTCP_ATTR_DADDR4] ||
 		    !info->attrs[MPTCP_ATTR_DPORT]) {
+			mptcp_debug ( "%s: missing daddr or dport", __func__ );
 			goto create_failed;
 		} else {
 			rem.addr.s_addr =
@@ -874,6 +914,8 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 			bool found = false;
 
 			mptcp_for_each_bit_set(priv->loc4_bits, i) {
+
+				mptcp_debug ( "%s: comparing %u and loc_id %u", __func__, priv->locaddr4[i].loc4_id, loc_id);
 				if (priv->locaddr4[i].loc4_id == loc_id) {
 					loc.addr	= priv->locaddr4[i].addr;
 					loc.low_prio	=
@@ -886,7 +928,11 @@ mptcp_nl_genl_create(struct sk_buff *skb, struct genl_info *info)
 			}
 
 			if (!found)
+			{
+				mptcp_debug ( "%s: could not find addr on if_idx %u and loc_id %u", __func__, if_idx, loc_id);
 				goto create_failed;
+			}
+
 		} else {
 			loc.addr.s_addr =
 				nla_get_u32(info->attrs[MPTCP_ATTR_SADDR4]);
@@ -962,6 +1008,8 @@ unlock:
 	return ret;
 
 create_failed:
+
+	mptcp_debug ( "%s: create_failed goto: failed to create a subflow", __func__ );
 	ret = -EINVAL;
 	goto unlock;
 }
@@ -977,7 +1025,10 @@ mptcp_nl_subsk_lookup(struct mptcp_cb *mpcb, struct nlattr **attrs)
 
 	if (!attrs[MPTCP_ATTR_FAMILY] || !attrs[MPTCP_ATTR_SPORT] ||
 	    !attrs[MPTCP_ATTR_DPORT])
+	{
+		mptcp_debug("%s: missing FAMILY, DPORT or SPORT", __func__);
 		goto exit;
+	}
 
 	family	= nla_get_u16(attrs[MPTCP_ATTR_FAMILY]);
 	sport	= htons(nla_get_u16(attrs[MPTCP_ATTR_SPORT]));
@@ -988,7 +1039,10 @@ mptcp_nl_subsk_lookup(struct mptcp_cb *mpcb, struct nlattr **attrs)
 		__be32 saddr, daddr;
 
 		if (!attrs[MPTCP_ATTR_SADDR4] || !attrs[MPTCP_ATTR_DADDR4])
+		{
+			mptcp_debug("%s: missing SADDR or DADDR", __func__);
 			break;
+		}
 
 		saddr	= nla_get_u32(attrs[MPTCP_ATTR_SADDR4]);
 		daddr	= nla_get_u32(attrs[MPTCP_ATTR_DADDR4]);
@@ -1000,6 +1054,11 @@ mptcp_nl_subsk_lookup(struct mptcp_cb *mpcb, struct nlattr **attrs)
 			if (subsk->sk_family != AF_INET)
 				continue;
 
+			mptcp_dump_sf_info(mptcp);
+			mptcp_debug ("%s: comparing with saddr: %pI4:%d daddr %pI4:%d",
+					__func__,
+					&saddr, ntohs(sport), &daddr, ntohs(dport));
+
 			if (isk->inet_saddr == saddr &&
 			    isk->inet_daddr == daddr &&
 			    isk->inet_sport == sport &&
@@ -1008,6 +1067,8 @@ mptcp_nl_subsk_lookup(struct mptcp_cb *mpcb, struct nlattr **attrs)
 				goto found;
 			}
 		}
+
+		mptcp_debug("%s: could not find a match", __func__);
 		break;
 	}
 #if IS_ENABLED(CONFIG_IPV6)
@@ -1057,13 +1118,19 @@ mptcp_nl_genl_destroy(struct sk_buff *skb, struct genl_info *info)
 	u32		token;
 
 	if (!info->attrs[MPTCP_ATTR_TOKEN])
+	{
+		mptcp_debug ( "No token in package" );
 		return -EINVAL;
+	}
 
 	token = nla_get_u32(info->attrs[MPTCP_ATTR_TOKEN]);
 
 	meta_sk = mptcp_hash_find(genl_info_net(info), token);
 	if (!meta_sk)
+	{
+		mptcp_debug ( "Could not find a connection with this token" );
 		return -EINVAL;
+	}
 
 	mpcb = tcp_sk(meta_sk)->mpcb;
 
@@ -1077,6 +1144,8 @@ mptcp_nl_genl_destroy(struct sk_buff *skb, struct genl_info *info)
 		mptcp_send_reset(subsk);
 		local_bh_enable();
 	} else {
+
+		mptcp_debug ( "Could not find a connection with this token" );
 		ret = -EINVAL;
 	}
 
@@ -1105,7 +1174,11 @@ mptcp_nl_genl_conn_exists(struct sk_buff *skb, struct genl_info *info)
 	return 0;
 }
 
-/* Addition by me to clamp window to a specific value */
+/* Addition by me to clamp window to a specific value
+ * Use subsk = mptcp_nl_subsk_lookup(mpcb, info->attrs); to select a subflow
+ * Goal is to play:
+ *   u32 snd_cwnd_clamp;  Do not allow snd_cwnd to grow above this
+ */
 static int
 mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
 {
@@ -1113,42 +1186,53 @@ mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
 	struct mptcp_cb	*mpcb;
 	int		ret = 0;
 	u32		token;
-	u8		backup = 0;
+	u32		cwnd_clamp = 0;
 
-	if (!info->attrs[MPTCP_ATTR_TOKEN])
+	if (!info->attrs[MPTCP_ATTR_TOKEN]) {
+		mptcp_debug ( "%s: No token specified !!", __func__);
 		return -EINVAL;
-
-	mptcp_debug ( "Clamp window was called start !!" );
+	}
+	if (!info->attrs[MPTCP_ATTR_CWND]) {
+		mptcp_debug ( "%s: No cwnd clamp specified !!", __func__);
+		return -EINVAL;
+	}
 
 	token = nla_get_u32(info->attrs[MPTCP_ATTR_TOKEN]);
-	if (info->attrs[MPTCP_ATTR_BACKUP])
-		backup = nla_get_u8(info->attrs[MPTCP_ATTR_BACKUP]);
+	cwnd_clamp = nla_get_u32(info->attrs[MPTCP_ATTR_CWND]);
 
 	meta_sk = mptcp_hash_find(genl_info_net(info), token);
-	if (!meta_sk)
+	if (!meta_sk) {
+		mptcp_debug ("%s: Clamp window was called !!", __func__);
 		return -EINVAL;
+	}
 
 	mpcb = tcp_sk(meta_sk)->mpcb;
 
 	mutex_lock(&mpcb->mpcb_mutex);
 	lock_sock_nested(meta_sk, SINGLE_DEPTH_NESTING);
 
-	mptcp_debug ( "Clamp window was called !!" );
 
-	/* subsk = mptcp_nl_subsk_lookup(mpcb, info->attrs); */
-	/* if (subsk) { */
-	/* 	tcp_sk(subsk)->mptcp->send_mp_prio	= 1; */
-	/* 	tcp_sk(subsk)->mptcp->low_prio		= !!backup; */
+	subsk = mptcp_nl_subsk_lookup(mpcb, info->attrs);
+	if (subsk) {
 
-	/* 	local_bh_disable(); */
-	/* 	if (mptcp_sk_can_send_ack(subsk)) */
-	/* 		tcp_send_ack(subsk); */
-	/* 	else */
-	/* 		ret = -ENOTCONN; */
-	/* 	local_bh_enable(); */
-	/* } else { */
-	/* 	ret = -EINVAL; */
-	/* } */
+		/* TODO update the clamp window
+		 * check it's not changed somewhere else ?
+		 * clamp it to the initial CW ?
+		 */
+		tcp_sk(subsk)->snd_cwnd_clamp = cwnd_clamp;
+		mptcp_debug ( "%s: SUCCESS !! Clamped window was called and set to %u !", __func__, cwnd_clamp);
+
+		local_bh_disable();
+		/* if (mptcp_sk_can_send_ack(subsk)) */
+		/* 	tcp_send_ack(subsk); */
+		/* else { */
+		/* 	ret = -ENOTCONN; */
+		/* } */
+		local_bh_enable();
+	} else {
+		mptcp_debug ("%s: could not find subflow", __func__);
+		ret = -EINVAL;
+	}
 
 	release_sock(meta_sk);
 	mutex_unlock(&mpcb->mpcb_mutex);
