@@ -10,21 +10,15 @@ let
   #   inherit stdenv;
   #   inherit (linux_mptcp_trunk) src version modDirVersion;
   #   # version = linux_mptcp_94.version;
-
   #   configfile = /home/teto/dotfiles/kernels/mptcp_trunk_netlink.config;
   #   # we need this to true else the kernel can't parse the config and 
   #   # detect if modules are in used
   #   allowImportFromDerivation = true;
   #   # modDirVersion="4.19.10";
-
   # });
 
-  pkg = linux_mptcp_trunk_raw;
-
-  # pkg = pkgs.mptcp-local.override( {
-  #   modVersion="4.9.87+";
-  #   modDirVersion="4.9.87+";
-  # });
+  # pkg = linux_mptcp_trunk_raw;
+  pkg = linux_mptcp_trunk_dev ;
 
 in
   pkg.overrideAttrs (oa: {
