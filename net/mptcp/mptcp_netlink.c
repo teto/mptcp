@@ -1222,13 +1222,6 @@ mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
 		tcp_sk(subsk)->snd_cwnd_clamp = cwnd_clamp;
 		mptcp_debug ( "%s: SUCCESS !! Clamped window was called and set to %u !", __func__, cwnd_clamp);
 
-		local_bh_disable();
-		/* if (mptcp_sk_can_send_ack(subsk)) */
-		/* 	tcp_send_ack(subsk); */
-		/* else { */
-		/* 	ret = -ENOTCONN; */
-		/* } */
-		local_bh_enable();
 	} else {
 		mptcp_debug ("%s: could not find subflow", __func__);
 		ret = -EINVAL;
