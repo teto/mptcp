@@ -82,9 +82,10 @@ static const struct nla_policy mptcp_nl_genl_policy[MPTCP_ATTR_MAX + 1] = {
 static u16 mptcp_nl_event_filter;
 
 
-static void mptcp_dump_sf_info(struct mptcp_tcp_sock	*mptcp)
+static void mptcp_dump_sf_info(struct sock	*subsk)
 {
-	struct sock *subsk = mptcp_to_sock(mptcp);
+	/* struct sock *subsk = mptcp_to_sock(mptcp); */
+	/* struct sock *subsk = mptcp; */
 	struct inet_sock *isk = inet_sk(subsk);
 
 	/* mpcb = tcp_sk(meta_sk)->mpcb; */
@@ -1054,7 +1055,7 @@ mptcp_nl_subsk_lookup(struct mptcp_cb *mpcb, struct nlattr **attrs)
 			if (subsk->sk_family != AF_INET)
 				continue;
 
-			mptcp_dump_sf_info(mptcp);
+			mptcp_dump_sf_info(subsk);
 			mptcp_debug ("%s: comparing with saddr: %pI4:%d daddr %pI4:%d",
 					__func__,
 					&saddr, ntohs(sport), &daddr, ntohs(dport));
@@ -1068,7 +1069,9 @@ mptcp_nl_subsk_lookup(struct mptcp_cb *mpcb, struct nlattr **attrs)
 			}
 		}
 
-		mptcp_debug("%s: could not find a match", __func__);
+		mptcp_debug ("%s: could not find a match for saddr: %pI4:%d daddr %pI4:%d",
+				__func__,
+					&saddr, ntohs(sport), &daddr, ntohs(dport));
 		break;
 	}
 #if IS_ENABLED(CONFIG_IPV6)
@@ -1221,6 +1224,7 @@ mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
 		 */
 		tcp_sk(subsk)->snd_cwnd_clamp = cwnd_clamp;
 		mptcp_debug ( "%s: SUCCESS !! Clamped window was called and set to %u !", __func__, cwnd_clamp);
+		mptcp_dump_sf_info (subsk);
 
 	} else {
 		mptcp_debug ("%s: could not find subflow", __func__);
