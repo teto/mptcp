@@ -1205,7 +1205,7 @@ mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
 
 	meta_sk = mptcp_hash_find(genl_info_net(info), token);
 	if (!meta_sk) {
-		mptcp_debug ("%s: Clamp window was called !!", __func__);
+		mptcp_debug ("%s: Clamp window was called with unknown token %u", __func__, token);
 		return -EINVAL;
 	}
 
