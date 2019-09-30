@@ -246,8 +246,10 @@ kill:
 		return TCP_TW_SYN;
 	}
 
-	if (paws_reject)
+	if (paws_reject) {
+		printk ("%s: PAWS reject in timewait", __func__);
 		__NET_INC_STATS(twsk_net(tw), LINUX_MIB_PAWSESTABREJECTED);
+	}
 
 	if (!th->rst) {
 		/* In this case we must reset the TIMEWAIT timer.
@@ -537,6 +539,7 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 					       keepalive_time_when(newtp));
 
 	newtp->rx_opt.tstamp_ok = ireq->tstamp_ok;
+	newtp->rx_opt.tstamp_extended = ireq->tstamp_extended;
 	newtp->rx_opt.sack_ok = ireq->sack_ok;
 	newtp->window_clamp = req->rsk_window_clamp;
 	newtp->rcv_ssthresh = req->rsk_rcv_wnd;
@@ -554,7 +557,10 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 
 	if (newtp->rx_opt.tstamp_ok) {
 		newtp->rx_opt.ts_recent = req->ts_recent;
-		newtp->rx_opt.ts_recent_stamp = ktime_get_seconds();
+			newtp->rx_opt.ts_recent_stamp = ktime_get_seconds();
+
+			/* min(ireq->tsext_precision, sysctl_tcp_timestamps_precision) */
+			newtp->tsext_precision = ireq->tsext_precision;
 		newtp->tcp_header_len = sizeof(struct tcphdr) + TCPOLEN_TSTAMP_ALIGNED;
 	} else {
 		newtp->rx_opt.ts_recent_stamp = 0;
@@ -753,14 +759,33 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 					  &tcp_rsk(req)->last_oow_ack_time))
 			req->rsk_ops->send_ack(sk, skb, req);
 		if (paws_reject)
+		{
+			printk ("%s: PAWS reject", __func__);
 			__NET_INC_STATS(sock_net(sk), LINUX_MIB_PAWSESTABREJECTED);
+		}
 		return NULL;
 	}
 
 	/* In sequence, PAWS is OK. */
 
 	if (tmp_opt.saw_tstamp && !after(TCP_SKB_CB(skb)->seq, tcp_rsk(req)->rcv_nxt))
+	{
 		req->ts_recent = tmp_opt.rcv_tsval;
+
+		/* a few lines before we have tmp_opt.ts_recent = req->ts_recent; */
+		/* override ts_recent only if extended tstamp have been negotiated */
+		if (inet_rsk(req)->tstamp_extended) {
+			/* TODO do it only if the other is also a timestampextended ! */
+			pr_info ("%s: Connection request: setting tsecr to %u", __func__, tmp_opt.rcv_tsecr);
+			/* TODO what precision should we use then ? */ 
+			req->ts_recent = tcp_time_stamp_extended(sysctl_tcp_timestamps_precision) - tmp_opt.rcv_tsval;
+			pr_info ("changed req->ts_recent to %u\n", req->ts_recent);
+			/* both should be in the same precision so we need to decode the used precision */
+			/* req->ts_recent = tcp_time_stamp_extended(sysctl_tcp_timestamps_precision) */ 
+			/* 	- tcp_convert_peer_ts(TCP_TSEXT_PRECISION_US, tmp_opt.rcv_tsval); */
+			/* SYN_RCVD so should already be ok ? req->tstamp_extended = 1; */
+		}
+	}
 
 	if (TCP_SKB_CB(skb)->seq == tcp_rsk(req)->rcv_isn) {
 		/* Truncate SYN, it is out of window starting

@@ -105,6 +105,36 @@ static inline __u32 tcp_acceptable_seq(const struct sock *sk)
 		return tcp_wnd_end(tp);
 }
 
+/* https://www.ietf.org/archive/id/draft-scheffenegger-tcpm-timestamp-negotiation-05.txt
+ * follows the specs in "encoding of timestamp intervals"
+ * strictly positive
+ * For now we restrict ourselves to simpler precisions
+ * like 
+ */
+static inline u32 tcp_ts_interval (void)
+{
+	/* for now we assume both kernels have similar precision
+	* We need to set it to a value bigger than 1 else
+	* extended timestamps will get disabled
+	*/
+	/* long ns_prec = 1/CLOCKS_PER_SEC * 1000000000; */
+	u32 ns_prec = ktime_get_resolution_ns();
+
+	/* can be 0 careful */
+	pr_info("clock precision of %uns", ns_prec);
+	/* return max_t(u32, ns_prec, 1); */
+	return 1;
+}
+
+
+static inline __u32 tcp_timestamp_extended_option(int timestamp_value, u32 precision)
+{
+	/* version on 2 bits 
+	 * value wallclock => 1
+	 */
+	return TCP_TSEXT_EXO_MASK |  ( (timestamp_value == 4) << 29) | (0x00ffffff & precision);
+}
+
 /* Calculate mss to advertise in SYN segment.
  * RFC1122, RFC1063, draft-ietf-tcpimpl-pmtud-01 state that:
  *
@@ -595,6 +625,7 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 	struct tcp_sock *tp = tcp_sk(sk);
 	unsigned int remaining = MAX_TCP_OPTION_SPACE;
 	struct tcp_fastopen_request *fastopen = tp->fastopen_req;
+	int tcp_timestamps = sock_net(sk)->ipv4.sysctl_tcp_timestamps;
 
 	*md5 = NULL;
 #ifdef CONFIG_TCP_MD5SIG
@@ -624,6 +655,28 @@ static unsigned int tcp_syn_options(struct sock *sk, struct sk_buff *skb,
 		opts->options |= OPTION_TS;
 		opts->tsval = tcp_skb_timestamp(skb) + tp->tsoffset;
 		opts->tsecr = tp->rx_opt.ts_recent;
+
+		if (tcp_timestamps > 2) {
+			/* we set the EXO = extended option (1 bit) */
+			WARN(opts->tsecr != 0, "tsecr should not be null");
+			// write an inline function
+			/* opts->tsecr = TCP_TS_EXO_MASK |  ( (sysctl_tcp_timestamps == 4) << 29) | (0x1fff & tcp_ts_interval()); */
+			pr_info ("ts_extended=> initial precision %u", tp->tsext_precision);
+			tp->tsext_precision = sysctl_tcp_timestamps_precision;
+			pr_info ("ts_extended=> socket setup with precision %u", tp->tsext_precision);
+			opts->tsval = tcp_time_stamp_extended(tp->tsext_precision);
+			opts->tsecr = tcp_timestamp_extended_option(tcp_timestamps, tp->tsext_precision);
+			tp->retrans_stamp = opts->tsval;
+				/* we hijack rcv_tstamp to save tsval so that we can XOR in the synsent answer 
+			 * look at retrans_stamp instead */
+
+			pr_info("%s: adding tsecr=%u to SYN", __func__, opts->tsecr);
+
+		} else {
+			/* that's 0 */
+			pr_warn("%s tsecr is not null %u", __func__, opts->tsecr);
+		}
+
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
 	}
 	if (likely(sock_net(sk)->ipv4.sysctl_tcp_window_scaling)) {
@@ -694,9 +747,27 @@ static unsigned int tcp_synack_options(const struct sock *sk,
 		remaining -= TCPOLEN_WSCALE_ALIGNED;
 	}
 	if (likely(ireq->tstamp_ok)) {
+		struct net *net = read_pnet(&ireq->ireq_net);
 		opts->options |= OPTION_TS;
 		opts->tsval = tcp_skb_timestamp(skb) + tcp_rsk(req)->ts_off;
 		opts->tsecr = req->ts_recent;
+
+		if (ireq->tstamp_extended && net->ipv4.sysctl_tcp_timestamps > 2) {
+			/* return sender tsval XOR our config. */
+			opts->tsval = tcp_time_stamp_extended(ireq->tsext_precision);
+			opts->tsecr = req->ts_recent ^ tcp_timestamp_extended_option(
+				net->ipv4.sysctl_tcp_timestamps,
+				ireq->tsext_precision);
+			mptcp_debug ("%s: extended ts, reusing syn tsval=%u, sending tsecr=%u (xoring option with syn.tsval %u)",
+					__func__, 
+					req->ts_recent,
+					opts->tsecr,
+					req->ts_recent
+					);
+		} else {
+			pr_warn ("no ts_extended in synack: ireq->tstamp_extended=%u", ireq->tstamp_extended);
+		}
+
 		remaining -= TCPOLEN_TSTAMP_ALIGNED;
 	}
 	if (likely(ireq->sack_ok)) {
@@ -753,7 +824,20 @@ static unsigned int tcp_established_options(struct sock *sk, struct sk_buff *skb
 	if (likely(tp->rx_opt.tstamp_ok)) {
 		opts->options |= OPTION_TS;
 		opts->tsval = skb ? tcp_skb_timestamp(skb) + tp->tsoffset : 0;
+
+		/* we don't care if ts_extended is enabled or not, we need to prevent too big a jump
+		 * between unlikely(tp->rx_opt.tstamp_extended) 
+		 */
+		if(sock_net(sk)->ipv4.sysctl_tcp_timestamps > 2) {
+			printk ("%s: a priori sending with precision %u", __func__, tp->tsext_precision);
+			opts->tsval = tcp_time_stamp_extended(tp->tsext_precision) + tp->tsoffset;
+		}
+
+		/* In extended mode, the ts_recent value was already changed to the
+		 * forward OWD in tcp_store_ts_recent */
 		opts->tsecr = tp->rx_opt.ts_recent;
+		owd_debug(tp, "sending tsecr=%u", opts->tsecr);
+
 		size += TCPOLEN_TSTAMP_ALIGNED;
 	}
 	if (mptcp(tp))

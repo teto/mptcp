@@ -86,6 +86,8 @@ struct inet_request_sock {
 	u32			snd_wscale : 4,
 				rcv_wscale : 4,
 				tstamp_ok  : 1,
+				tstamp_extended : 2,
+				/* save at version number tstamp_extended : 1, */
 				sack_ok	   : 1,
 				wscale_ok  : 1,
 				ecn_ok	   : 1,
@@ -95,6 +97,7 @@ struct inet_request_sock {
 				saw_mpc    : 1,
 				smc_ok	   : 1;
 	u32                     ir_mark;
+	u32                     tsext_precision; /* client precision */
 	union {
 		struct ip_options_rcu __rcu	*ireq_opt;
 #if IS_ENABLED(CONFIG_IPV6)
