@@ -253,6 +253,12 @@ struct tcp_info {
 	__u64	tcpi_bytes_retrans;  /* RFC4898 tcpEStatsPerfOctetsRetrans */
 	__u32	tcpi_dsack_dups;     /* RFC4898 tcpEStatsStackDSACKDups */
 	__u32	tcpi_reord_seen;     /* reordering events seen */
+
+
+
+	/* additions at the end hoping it will break less stuff */
+	__u32	tcpi_fowd;  /* forward owd */
+	__u32	tcpi_bowd;  /* backward owd */
 };
 
 /* netlink attributes types for SCM_TIMESTAMPING_OPT_STATS */

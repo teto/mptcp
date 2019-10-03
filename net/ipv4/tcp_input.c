@@ -3636,8 +3636,8 @@ static void tcp_store_ts_recent(struct tcp_sock *tp)
 
 
 	} else {
-		printk("non-extended: storing ts_recent %u\n", tp->rx_opt.rcv_tsval);
-	tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
+		/* printk("non-extended: storing ts_recent %u\n", tp->rx_opt.rcv_tsval); */
+		tp->rx_opt.ts_recent = tp->rx_opt.rcv_tsval;
 	}
 
 	tp->rx_opt.ts_recent_stamp = ktime_get_seconds();

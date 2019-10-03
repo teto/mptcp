@@ -82,19 +82,13 @@ static const struct nla_policy mptcp_nl_genl_policy[MPTCP_ATTR_MAX + 1] = {
 static u16 mptcp_nl_event_filter;
 
 
-static void mptcp_dump_sf_info(struct sock	*subsk)
+static void mptcp_dump_sf_info(const char *prefix, struct sock	*subsk)
 {
-	/* struct sock *subsk = mptcp_to_sock(mptcp); */
-	/* struct sock *subsk = mptcp; */
 	struct inet_sock *isk = inet_sk(subsk);
 
-	/* mpcb = tcp_sk(meta_sk)->mpcb; */
 	mptcp_debug(
-		/* "%s: token %#x pi %d" */
-		" src_addr:%pI4:%d dst_addr:%pI4:%d\n",
-			/* __func__ , */
-			/* mpcb->mptcp_loc_token, */
-			/* tp->mptcp->path_index, */
+		"%s src_addr:%pI4:%d dst_addr:%pI4:%d\n",
+			prefix,
 			&isk->inet_saddr,
 			ntohs(isk->inet_sport),
 			&isk->inet_daddr,
@@ -1055,7 +1049,7 @@ mptcp_nl_subsk_lookup(struct mptcp_cb *mpcb, struct nlattr **attrs)
 			if (subsk->sk_family != AF_INET)
 				continue;
 
-			mptcp_dump_sf_info(subsk);
+			mptcp_dump_sf_info("comparing: ", subsk);
 			mptcp_debug ("%s: comparing with saddr: %pI4:%d daddr %pI4:%d",
 					__func__,
 					&saddr, ntohs(sport), &daddr, ntohs(dport));
@@ -1224,7 +1218,7 @@ mptcp_nl_genl_clamp_window(struct sk_buff *skb, struct genl_info *info)
 		 */
 		tcp_sk(subsk)->snd_cwnd_clamp = cwnd_clamp;
 		mptcp_debug ( "%s: SUCCESS !! Clamped window was called and set to %u !", __func__, cwnd_clamp);
-		mptcp_dump_sf_info (subsk);
+		mptcp_dump_sf_info ("Applied to:", subsk);
 
 	} else {
 		mptcp_debug ("%s: could not find subflow", __func__);
