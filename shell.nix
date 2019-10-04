@@ -19,9 +19,14 @@ let
 
   # pkg = linux_mptcp_trunk_raw;
   pkg = linux_mptcp_trunk_dev ;
+  # SK_MEM_QUANTUM
 
 in
   pkg.overrideAttrs (oa: {
+    buildInputs = (oa.buildInputs or []) ++ [
+      # pkgs.cquery # too old, some issues with coc + references
+      pkgs.ccls
+    ];
     shellHook = ''
       touch .scmversion
       echo "hello boss"
